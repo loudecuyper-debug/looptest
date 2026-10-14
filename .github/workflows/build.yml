@@ -1,0 +1,62 @@
+# Bouwt bij elke push een (niet-ondertekende) LoopTest.ipa.
+# SideStore ondertekent hem daarna met je eigen Apple ID.
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: XcodeGen installeren
+        run: brew install xcodegen
+
+      - name: Xcode-project genereren
+        run: xcodegen generate
+
+      - name: App bouwen
+        run: |
+          xcodebuild \
+            -project LoopTest.xcodeproj \
+            -scheme LoopTest \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build > build.log 2>&1 || {
+              echo "::error::Build mislukt, fouten hieronder"
+              grep -E "error:" build.log | head -n 40
+              tail -n 40 build.log
+              exit 1
+            }
+          tail -n 5 build.log
+
+      - name: IPA maken
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/LoopTest.app Payload/
+          zip -qry LoopTest.ipa Payload
+          ls -lh LoopTest.ipa
+
+      - name: Uploaden als artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LoopTest-ipa
+          path: LoopTest.ipa
+
+      - name: Publiceren als release (makkelijk downloaden op je iPhone)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: LoopTest build ${{ github.run_number }}
+          files: LoopTest.ipa
+          make_latest: true
