@@ -8,11 +8,13 @@ let package = Package(
     platforms: [.iOS(.v17), .macOS(.v13)],
     products: [
         .library(name: "LoopCore", targets: ["LoopCore"]),
-        .executable(name: "plan-preview", targets: ["PlanPreview"])
+        .executable(name: "plan-preview", targets: ["PlanPreview"]),
+        .executable(name: "cue-preview", targets: ["CuePreview"])
     ],
     targets: [
         .target(name: "LoopCore"),
         .executableTarget(name: "PlanPreview", dependencies: ["LoopCore"]),
+        .executableTarget(name: "CuePreview", dependencies: ["LoopCore"]),
         .testTarget(name: "LoopCoreTests", dependencies: ["LoopCore"])
     ]
 )

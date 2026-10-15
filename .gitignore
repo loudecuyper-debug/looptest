@@ -6,4 +6,5 @@ Payload/
 LoopCore/.build/
 LoopCore/.swiftpm/
 LoopCore/plan-preview.md
+LoopCore/cue-preview.md
 LoopCore/test.log

@@ -1,5 +1,5 @@
-# Test het plan-brein (LoopCore) en toont een leesbare plan-preview.
-# Resultaat: open de run in het tabblad Actions, de preview staat onder "Summary".
+# Test het plan-brein (LoopCore) en toont een leesbare plan-preview en cue-preview.
+# Resultaat: open de run in het tabblad Actions, de previews staan onder "Summary".
 name: LoopCore tests
 
 on:
@@ -27,8 +27,15 @@ jobs:
           swift run plan-preview > plan-preview.md
           cat plan-preview.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Preview bewaren
+      - name: Cue-preview maken
+        run: |
+          swift run cue-preview > cue-preview.md
+          cat cue-preview.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Previews bewaren
         uses: actions/upload-artifact@v4
         with:
-          name: plan-preview
-          path: LoopCore/plan-preview.md
+          name: previews
+          path: |
+            LoopCore/plan-preview.md
+            LoopCore/cue-preview.md
