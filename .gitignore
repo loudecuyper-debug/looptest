@@ -3,3 +3,7 @@ build/
 Payload/
 *.ipa
 .DS_Store
+LoopCore/.build/
+LoopCore/.swiftpm/
+LoopCore/plan-preview.md
+LoopCore/test.log

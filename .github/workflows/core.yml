@@ -1,0 +1,34 @@
+# Test het plan-brein (LoopCore) en toont een leesbare plan-preview.
+# Resultaat: open de run in het tabblad Actions, de preview staat onder "Summary".
+name: LoopCore tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "LoopCore/**"
+      - ".github/workflows/core.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: LoopCore
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tests draaien
+        run: swift test 2>&1 | tee test.log; exit ${PIPESTATUS[0]}
+
+      - name: Plan-preview maken
+        run: |
+          swift run plan-preview > plan-preview.md
+          cat plan-preview.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preview bewaren
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-preview
+          path: LoopCore/plan-preview.md

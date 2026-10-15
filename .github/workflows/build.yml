@@ -1,10 +1,15 @@
 # Bouwt bij elke push een (niet-ondertekende) LoopTest.ipa.
 # SideStore ondertekent hem daarna met je eigen Apple ID.
+# Wijzigingen enkel in LoopCore of tekstbestanden maken geen nieuwe ipa.
 name: Build IPA
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "LoopCore/**"
+      - ".github/workflows/core.yml"
+      - "**.md"
   workflow_dispatch:
 
 permissions:
