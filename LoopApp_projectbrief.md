@@ -13,8 +13,8 @@ Gratis, persoonlijke Runna-achtige loopcoach voor Louis' iPhone. Native Swift-ap
 1. ~~Analyse van Runna~~ (klaar)
 2. ~~Features kiezen~~ (klaar, zie hieronder)
 3. **Proof of concept** (gebouwd, build werkt, installatie geblokkeerd, zie Status)
-4. **Technische opbouw: plan-brein, datamodel, schermen** ← **bezig** (zie Fase 4)
-5. UI
+4. ~~Technische opbouw: plan-brein, datamodel, schermen~~ (klaar 15 okt, zie Fase 4)
+5. **UI** ← **volgende stap**
 6. Volledige app bouwen
 
 Afspraken: eerst brainstormen tot het plan klopt, proof of concepts voor risicovolle onderdelen, opties voorleggen en goedkeuring vragen voor grote herschrijvingen. Communicatie in casual Nederlands. Geen em-dashes in teksten.
@@ -41,9 +41,13 @@ Afspraken: eerst brainstormen tot het plan klopt, proof of concepts voor risicov
 
 **Overzicht:** weekkalender, weekvolume-grafiek, PR's, voorspelde racetijden.
 
+**Overgenomen van Runna (15 okt):** workouts zelf verslepen in de kalender (binnen de week, met waarschuwing bij twee zware dagen naast elkaar), weekkilometers op Vandaag ("9,5 van 17,6 km"), manueel een loop toevoegen (gsm vergeten, loopband).
+
+**Backup:** knop "Backup maken" zet alles als één JSON-bestand in de Bestanden-app, "Backup terugzetten" zet het terug. Herinnering na 21 dagen zonder backup. Belangrijk omdat alles lokaal staat en een gesideloade app soms opnieuw geïnstalleerd moet worden.
+
 **Native extra's in v1:** kadans via bewegingssensor (ook treadmill zonder GPS), lokale meldingen ("morgen: 6×400 m"), widget met workout van vandaag.
 
-**Later:** hitte-aanpassing (weer-API), krachttraining, meerdere plannen na elkaar + herstelblok na race, import uit Apple Health, Siri/actieknop.
+**Later:** schoenen bijhouden (km per paar, melding rond 600 à 800 km), hitte-aanpassing (weer-API), krachttraining, meerdere plannen na elkaar + herstelblok na race, import uit Apple Health, Siri/actieknop.
 
 **Niet:** sociale features, racedatabase, smartwatch, AI-briefings.
 
@@ -86,7 +90,7 @@ Stappen:
 1. ~~Pace-zones + racevoorspelling + testopzet~~ (klaar, tests groen op 15 okt)
 2. ~~Plangenerator~~ + 3. ~~Workout-bibliotheek~~ (eerste versie, afgestemd op 10 km sneller; regels eerst in een Python-prototype uitgetest en goedgekeurd, daarna naar Swift)
 4. ~~Adaptatieregels~~ (regels eerst in Python gesimuleerd op 4 scenario's, goedgekeurd, daarna naar Swift: `Coach`)
-5. Opslag van gelopen loopjes en schermstructuur ← **volgende**
+5. ~~Opslag van gelopen loopjes en schermstructuur~~ (klaar, zie hieronder)
 
 Adaptatieregels v1 (`Coach.swift`):
 - Zones: 2 kwaliteitssessies op rij 3+ s/km sneller én RPE ≤ 7 → voorstel niveau +0,5. 2 op rij 5+ s/km trager of vroeger gestopt → voorstel -0,5. Max 1 voorstel per 2 weken, nooit in de taperweek. **Enkel het gelopen tempo beslist over de zones**, RPE niet.
@@ -117,6 +121,26 @@ Bestanden LoopCore:
 | `Sources/PlanPreview/main.swift` | Preview: zones, volledig 12-weken-plan, voorbeeld extra loop, vergelijking 4 dagen, coach-scenario's A-E |
 | `Tests/LoopCoreTests/*.swift` | Tests tegen Daniels-tabellen en het Python-prototype, structuur plan, extra loop, coach-scenario's, Niet 100%, Codable |
 
+## Schermstructuur (goedgekeurd 15 okt)
+Vijf tabbladen, zoals Runna:
+1. **Vandaag**: workout van vandaag (inhoud, tempo's, geschatte duur, startknop), weekkilometers, meldingen van de coach (tempo's aanpassen ja/nee, tips), knoppen *Extra loop* en *Niet 100%*, vrij lopen starten. Rustdag: wat komt er morgen.
+2. **Plan**: tempozones, voorspelde racetijden, niveau en voortgang naar het doel, plan beheren (plan opnieuw maken, loopdagen, dag lange loop).
+3. **Kalender**: alle weken met fase en km, status per workout (gelopen/gemist), workouts verslepen, tik voor details.
+4. **Voortgang**: alle loopjes (ook vrije en manuele, met + om manueel toe te voegen), weekvolume-grafiek, PR's (1 km, 5 km, 10 km, langste loop), niveau-verloop.
+5. **Instellingen**: stem testen, welke cues, backup maken/terugzetten, Apple Health.
+
+Over alles heen:
+- **Lopen** (volledig scherm): huidig blok, resterend, tempo vs. doel in kleur, afstand, pauze/blok overslaan/stop.
+- **Na de loop**: samenvatting, kaart, splits, per blok doel vs. echt, RPE + pijntje, daarna de reactie van de coach.
+- **Eerste keer**: vragenreeks (doel, recente tijd of testloop, weekvolume, langste loop, loopdagen, dag lange loop, weken of racedatum) en preview van het plan.
+
+## Opslag (`RunStore.swift`, `RunRecord.swift`, `Stats.swift`)
+- Map Documenten/LoopApp: `coach.json` (invoer + aanpassingen), `runs/<id>.json` per loop, `runs-index.json` (samenvattingen, nieuwste eerst), `meta.json` (laatste backup).
+- `CompletedRun`: datum, bron (gps/loopband/manueel), plek in plan, **workout zoals toen gepland**, status, afstand, tijd, km-splits, per blok doel vs. echt, route (3 lijsten lat/lon/tijd), RPE, pijntje, kadans, notitie. `coachResult` zet hem om voor de coach.
+- `Backup`: versie 1, JSON met coach + alle loopjes. Nieuwere versie wordt geweigerd.
+- `Stats`: weekkilometers gepland vs. gelopen (op datum, dus ook vrije loopjes), PR's uit opeenvolgende volle km-splits (manuele loopjes enkel voor langste loop).
+- `Coach.moveWorkout`: verslepen binnen de week, resultaat `moved(warning:)`, `dayTaken`, `nothingToMove`, `alreadyDone`.
+
 ## Status (15 oktober 2026)
 - ✅ GitHub Actions-build slaagt, `LoopTest.ipa` staat in Releases
 - ✅ SideStore geïnstalleerd op iPhone via iloader (na anisette-server wissel en keyring uitgeschakeld in iloader-settings)
@@ -125,5 +149,7 @@ Bestanden LoopCore:
 - Afspraak: niet blijven proberen (risico op tijdelijke blokkade). Langer dan 1 à 2 weken stuk: plan B bespreken (betaald Apple Developer-account €99/jaar).
 - Nog niet getest: GPS met scherm uit, kwaliteit van de cues.
 
+- ✅ LoopCore (plan-brein, coach, opslag) volledig getest in GitHub Actions.
+
 ## Volgende stap
-Run van `LoopCore tests` met de coach controleren (groen + scenario's in Summary). Daarna fase 4 stap 5: hoe gelopen loopjes bewaard worden (route, splits, resultaat per blok) en de schermstructuur van de app, voor we naar fase 5 (UI) gaan.
+Run met de opslag controleren (groen). Dan fase 5: UI. Eerst stijl en look afspreken (kleuren, lettertype, hoe Vandaag en het loopscherm eruitzien), daarna de schermen bouwen. LoopCore moet dan ook in de app gekoppeld worden via XcodeGen (`packages:` in `project.yml`).

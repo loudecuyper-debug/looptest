@@ -131,6 +131,48 @@ public struct Coach: Codable, Equatable, Sendable {
         state.update(week: when.week) { $0.extraDays.removeAll { $0 == when.day } }
     }
 
+    // MARK: - Verslepen in de kalender
+
+    public enum MoveOutcome: Equatable, Sendable {
+        /// Verplaatst. Met een waarschuwing als er nu twee zware dagen naast elkaar liggen.
+        case moved(warning: String?)
+        case dayTaken
+        case nothingToMove
+        case alreadyDone
+    }
+
+    /// Workout zelf naar een andere dag van dezelfde week slepen.
+    public mutating func moveWorkout(at when: PlanDay, to day: Weekday) -> MoveOutcome {
+        guard let plan = self.plan(), when.week < plan.weeks.count else { return .nothingToMove }
+        let week = plan.weeks[when.week]
+        guard let workout = week.workout(on: when.day) else { return .nothingToMove }
+        guard day != when.day else { return .moved(warning: nil) }
+        guard week.workout(on: day) == nil else { return .dayTaken }
+        if state.results.contains(where: { $0.when == when && $0.status != .skipped }) { return .alreadyDone }
+
+        if workout.isExtra {
+            state.update(week: when.week) { a in
+                a.extraDays.removeAll { $0 == when.day }
+                a.extraDays.append(day)
+            }
+        } else {
+            move(from: when.day, to: day, weekIndex: when.week)
+        }
+
+        guard Coach.isHard(workout) else { return .moved(warning: nil) }
+        let neighbours = [day.rawValue - 1, day.rawValue + 1]
+            .compactMap { Weekday(rawValue: $0) }
+            .filter { $0 != when.day }
+            .compactMap { week.workout(on: $0) }
+        guard let other = neighbours.first(where: Coach.isHard) else { return .moved(warning: nil) }
+        return .moved(warning: "Let op: \(workout.title) ligt nu vlak naast \(other.title.lowercased()). "
+                      + "Twee zware dagen na elkaar verhoogt de kans op blessures.")
+    }
+
+    static func isHard(_ w: PlannedWorkout) -> Bool {
+        w.type.isQuality || w.type == .long || w.type == .progression
+    }
+
     // MARK: - Niet 100%
 
     public mutating func notFeeling(_ reason: NotFeelingReason, at when: PlanDay) -> [CoachEvent] {
@@ -305,7 +347,7 @@ public struct Coach: Codable, Equatable, Sendable {
     static func freeSlot(for day: Weekday, in week: PlanWeek) -> Weekday? {
         func isHard(_ d: Weekday) -> Bool {
             guard d != day, let w = week.workout(on: d) else { return false }
-            return w.type.isQuality || w.type == .long || w.type == .progression
+            return Coach.isHard(w)
         }
         return Weekday.allCases.first { d in
             guard d > day, week.workout(on: d) == nil else { return false }
