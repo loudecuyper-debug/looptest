@@ -14,13 +14,7 @@ public enum ExtraRun {
 
     /// Lengte van de extra loop: zoals een gewone rustige loop van die week, tussen 3 en 5 km.
     public static func suggestedKm(in week: PlanWeek) -> Double {
-        let easy = week.workouts.filter { $0.type == .easy && !$0.isExtra }
-            .compactMap { w -> Double? in
-                if case .distance(let m)? = w.blocks.first?.steps.first?.length { return m / 1000 }
-                return nil
-            }
-        let base = easy.isEmpty ? 4 : easy.reduce(0, +) / Double(easy.count)
-        return min(max(PlanGenerator.roundHalf(base), minKm), maxKm)
+        min(max(PlanGenerator.typicalEasyKm(week.workouts), minKm), maxKm)
     }
 
     /// Waarschuwing als de extra loop vlak voor een zware dag valt, anders nil.

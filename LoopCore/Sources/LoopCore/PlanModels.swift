@@ -141,6 +141,18 @@ public struct PlannedWorkout: Codable, Equatable, Sendable {
         self.isExtra = isExtra
     }
 
+    /// Afstand in km als dit een gewone loop is (één blok, één afstandsstap), anders nil.
+    public var plainKm: Double? {
+        guard blocks.count == 1, blocks[0].repeats == 1, blocks[0].steps.count == 1,
+              case .distance(let m) = blocks[0].steps[0].length else { return nil }
+        return m / 1000
+    }
+
+    /// Het belangrijkste doel van de workout: het eerste snelle blok, anders rustig.
+    public var mainTarget: StepTarget {
+        flattenedSteps.first { $0.kind == .work }?.target ?? .zone(.easy)
+    }
+
     /// Alle stappen achter elkaar, herhalingen uitgeschreven (voor de cue-engine).
     public var flattenedSteps: [WorkoutStep] {
         blocks.flatMap { block in (0..<block.repeats).flatMap { _ in block.steps } }
@@ -174,14 +186,21 @@ public struct PlanWeek: Codable, Equatable, Sendable {
     /// Maandag van deze week.
     public var startDate: Date
     public var workouts: [PlannedWorkout]
+    /// Niveau (VDOT) waarmee deze week gepland werd.
+    public var vdot: Double
 
-    public init(number: Int, phase: Phase, isRecoveryWeek: Bool, startDate: Date, workouts: [PlannedWorkout]) {
+    public init(number: Int, phase: Phase, isRecoveryWeek: Bool, startDate: Date,
+                workouts: [PlannedWorkout], vdot: Double) {
         self.number = number
         self.phase = phase
         self.isRecoveryWeek = isRecoveryWeek
         self.startDate = startDate
         self.workouts = workouts
+        self.vdot = vdot
     }
+
+    /// Tempozones van deze week.
+    public var zones: PaceZones { PaceZones(vdot: vdot) }
 
     public func workout(on day: Weekday) -> PlannedWorkout? {
         workouts.first { $0.day == day }

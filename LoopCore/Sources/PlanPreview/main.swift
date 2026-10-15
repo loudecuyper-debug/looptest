@@ -88,4 +88,79 @@ if let plan4 = PlanGenerator.generate(four, calendar: calendar) {
 }
 line()
 
+// MARK: - Coach-scenario's
+
+line("## Coach: hoe het plan bijstuurt")
+line("Gesimuleerde loopjes op het plan hierboven. Voorstellen worden telkens met \"ja\" beantwoord.")
+line()
+
+typealias RunMaker = (_ week: Int, _ planned: PlanWeek, _ workout: PlannedWorkout) -> RunResult?
+typealias WeekHook = (_ coach: inout Coach, _ week: Int) -> [CoachEvent]
+
+func scenario(_ title: String, weeks: Int = 12, before: WeekHook? = nil, _ makeRun: RunMaker) {
+    var coach = Coach(input: input)
+    var log: [String] = []
+    for w in 0..<weeks {
+        if let before {
+            log += before(&coach, w).map { "Week \(w + 1): \($0.message)" }
+        }
+        guard let week = coach.plan(calendar: calendar)?.weeks[w] else { break }
+        for wo in week.workouts {
+            guard let r = makeRun(w, week, wo) else { continue }
+            for e in coach.record(r) {
+                log.append("Week \(w + 1) \(wo.day.short): \(e.message)")
+                if case .levelSuggestion(let s) = e { coach.accept(s) }
+            }
+        }
+        log += coach.finishWeek(w).map { "Week \(w + 1): \($0.message)" }
+    }
+    line("### \(title)")
+    for l in log { line("- \(l)") }
+    line()
+    guard let adapted = coach.plan(calendar: calendar),
+          let original = PlanGenerator.generate(input, calendar: calendar) else { return }
+    line("| Week | Origineel | Nu | Kwaliteit nu |")
+    line("|---|---|---|---|")
+    for (o, n) in zip(original.weeks, adapted.weeks).prefix(weeks) {
+        let q = n.workouts.first { $0.type.isQuality }
+        let qText = q.map { "\($0.day.short): \($0.title), \(WorkoutText.describe($0, zones: n.zones))" } ?? "-"
+        line("| \(n.number)\(n.isRecoveryWeek ? " (rust)" : "") | \(km(o.estimatedDistance(zones: o.zones))) km | \(km(n.estimatedDistance(zones: n.zones))) km | \(qText) |")
+    }
+    line()
+}
+
+scenario("A. Je bent fitter dan gedacht en wordt beter (echt niveau 39 → 41)") { w, _, wo in
+    let truth = PaceZones(vdot: 39 + 2 * Double(w) / 11)
+    var r = RunResult(when: PlanDay(week: w, day: wo.day), rpe: wo.type.isQuality ? 7 : nil)
+    if wo.type == .test {
+        r.workDuration = truth.predictedTime(distance: 10_000)
+    } else if wo.type.isQuality {
+        r.workPace = truth.pace(for: wo.mainTarget)
+    }
+    return r
+}
+
+scenario("B. Week 6: dinsdag en donderdag gemist", weeks: 8) { w, _, wo in
+    let skip = w == 5 && wo.day != .sunday
+    return RunResult(when: PlanDay(week: w, day: wo.day), status: skip ? .skipped : .done)
+}
+
+scenario("C. Weken 5 en 6 voelen veel zwaarder dan verwacht", weeks: 8) { w, _, wo in
+    let rpe = (4...5).contains(w) ? Int((Coach.expectedRPE(wo.type) + 2).rounded(.up)) : nil
+    return RunResult(when: PlanDay(week: w, day: wo.day), rpe: rpe)
+}
+
+scenario("D. Rustige loopjes steeds 20 s/km te snel", weeks: 6) { w, week, wo in
+    guard wo.type == .easy else { return RunResult(when: PlanDay(week: w, day: wo.day)) }
+    return RunResult(when: PlanDay(week: w, day: wo.day), averagePace: week.zones.easy.fast - 20)
+}
+
+scenario("E. Niet 100%: ziek van dinsdag tot vrijdag in week 6", weeks: 8, before: { coach, w in
+    guard w == 5 else { return [] }
+    return coach.notFeeling(.sick, at: PlanDay(week: 5, day: .tuesday))
+        + coach.recovered(at: PlanDay(week: 5, day: .saturday))
+}) { w, _, wo in
+    RunResult(when: PlanDay(week: w, day: wo.day))
+}
+
 print(out)

@@ -85,8 +85,20 @@ Regels plangenerator v1:
 Stappen:
 1. ~~Pace-zones + racevoorspelling + testopzet~~ (klaar, tests groen op 15 okt)
 2. ~~Plangenerator~~ + 3. ~~Workout-bibliotheek~~ (eerste versie, afgestemd op 10 km sneller; regels eerst in een Python-prototype uitgetest en goedgekeurd, daarna naar Swift)
-4. Adaptatieregels (zones schuiven, RPE-rem, gemiste sessies, "Niet 100%")
-5. Datamodel voor opslag en schermstructuur
+4. ~~Adaptatieregels~~ (regels eerst in Python gesimuleerd op 4 scenario's, goedgekeurd, daarna naar Swift: `Coach`)
+5. Opslag van gelopen loopjes en schermstructuur ← **volgende**
+
+Adaptatieregels v1 (`Coach.swift`):
+- Zones: 2 kwaliteitssessies op rij 3+ s/km sneller én RPE ≤ 7 → voorstel niveau +0,5. 2 op rij 5+ s/km trager of vroeger gestopt → voorstel -0,5. Max 1 voorstel per 2 weken, nooit in de taperweek. **Enkel het gelopen tempo beslist over de zones**, RPE niet.
+- Voorstel wordt gevraagd met één tik ("Je loopt sneller dan gepland. Tempo's aanpassen? (interval 4:50 → 4:47)") en pas na "ja" toegepast.
+- Tijdrit: niveau meteen op het resultaat.
+- Rustige loop 10+ s/km sneller dan de zone → tip. 3 van de laatste 5 → waarschuwing, max om de 2 weken.
+- RPE: week gemiddeld 1,5+ boven verwacht (rustig 3,5 · lang 5 · progressie 6 · tempo/fartlek 7 · interval 8 · tijdrit 9) → volgende week groeit niet. Twee weken op rij → rustweek komt vroeger, de geplande rustweek wordt een gewone week op hetzelfde niveau.
+- Pijn → volgende loop rustig en max 30 min. Twee keer binnen 7 dagen → "Niet 100%" voorstellen.
+- Gemist: rustige loop valt weg. Kwaliteit en lange loop schuiven naar een vrije dag later die week, niet naast een zware dag, anders weg. Lange loop weg → volgende lange loop groeit niet. 2+ sessies van een week gemist → die week telt niet mee voor de opbouw (de week erna neemt hetzelfde niveau over, niet nog eens bevroren).
+- "Niet 100%" (week telt niet mee): ziek = alles op pauze tot "beter", dan 3 dagen rustig. Pijntje = 3 dagen korte rustige loopjes. Geen tijd = rustige loopjes vallen weg, lange loop -25%. Moe = vandaag rustig, kwaliteit schuift naar een latere vrije dag als dat kan.
+- Het plan wordt altijd opnieuw berekend uit invoer + `AdaptationState` (aanpassingen per week, niveauwijzigingen, ziekteperiodes). Eerdere weken kunnen daardoor achteraf licht wijzigen; gelopen loopjes moeten dus apart bewaard worden (stap 5).
+- Opgemerkt: bij het testprofiel bepaalt de 42%-grens de lange loop, dus "lange loop groeit niet" heeft daar weinig effect.
 
 Bestanden LoopCore:
 | Bestand | Inhoud |
@@ -100,8 +112,10 @@ Bestanden LoopCore:
 | `Sources/LoopCore/PlanGenerator.swift` | De plangenerator met bovenstaande regels |
 | `Sources/LoopCore/ExtraRun.swift` | Extra loop toevoegen/verwijderen, waarschuwing, voorstel vaste dag |
 | `Sources/LoopCore/WorkoutText.swift` | NL-omschrijving van workouts |
-| `Sources/PlanPreview/main.swift` | Preview: zones, volledig 12-weken-plan, voorbeeld extra loop, vergelijking 4 dagen |
-| `Tests/LoopCoreTests/*.swift` | Tests tegen Daniels-tabellen en het Python-prototype, structuur plan, extra loop, Codable |
+| `Sources/LoopCore/AdaptationModels.swift` | `PlanDay`, `WeekAdjustment`, `DayOverride`, `LevelChange`, `SickPeriod`, `RunResult`, `NotFeelingReason`, `LevelSuggestion`, `CoachEvent` (met NL-teksten), `AdaptationState` |
+| `Sources/LoopCore/Coach.swift` | De coach: `record`, `accept`, `finishWeek`, `notFeeling`, `recovered`, extra loop |
+| `Sources/PlanPreview/main.swift` | Preview: zones, volledig 12-weken-plan, voorbeeld extra loop, vergelijking 4 dagen, coach-scenario's A-E |
+| `Tests/LoopCoreTests/*.swift` | Tests tegen Daniels-tabellen en het Python-prototype, structuur plan, extra loop, coach-scenario's, Niet 100%, Codable |
 
 ## Status (15 oktober 2026)
 - ✅ GitHub Actions-build slaagt, `LoopTest.ipa` staat in Releases
@@ -112,4 +126,4 @@ Bestanden LoopCore:
 - Nog niet getest: GPS met scherm uit, kwaliteit van de cues.
 
 ## Volgende stap
-Run van `LoopCore tests` met de plangenerator controleren (groen + volledig plan in Summary). Daarna fase 4 stap 4: adaptatieregels (zones schuiven op basis van gelopen tempo's, RPE-rem, gemiste sessies, "Niet 100%").
+Run van `LoopCore tests` met de coach controleren (groen + scenario's in Summary). Daarna fase 4 stap 5: hoe gelopen loopjes bewaard worden (route, splits, resultaat per blok) en de schermstructuur van de app, voor we naar fase 5 (UI) gaan.

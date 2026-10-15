@@ -9,6 +9,10 @@ import Foundation
 /// - Kwaliteit: 1 sessie per week; met 4+ loopdagen een tweede (tempo) in zwaarder en piek.
 /// - Kwaliteitsdagen zo ver mogelijk van de lange loop en van elkaar.
 /// - Laatste week: tijdrit over de doelafstand.
+///
+/// Aanpassingen van de coach (`AdaptationState`) worden bij elke berekening toegepast:
+/// niveau per week, bevroren weken, verschoven rustweken, verplaatste sessies,
+/// dag-overrides, extra loopjes en ziekteperiodes.
 public enum PlanGenerator {
 
     public static let volumeGrowth = 1.08
@@ -25,7 +29,8 @@ public enum PlanGenerator {
         }
     }
 
-    public static func generate(_ input: PlanInput, calendar: Calendar = PlanCalendar.default) -> TrainingPlan? {
+    public static func generate(_ input: PlanInput, adaptation: AdaptationState = AdaptationState(),
+                                calendar: Calendar = PlanCalendar.default) -> TrainingPlan? {
         guard let zones = PaceZones(distance: input.recentDistance, time: input.recentTime) else { return nil }
         let days = Array(Set(input.runDays)).sorted()
         guard days.count >= 2, days.contains(input.longRunDay), input.weeks >= 4 else { return nil }
@@ -42,14 +47,20 @@ public enum PlanGenerator {
         var volumeTrend = startVolume / volumeGrowth
         var longTrend = min(input.longestRunKm, 0.45 * startVolume + 1) - 1
         var lastLong = longTrend
+        var lastProgress = 0.0
         var weeks: [PlanWeek] = []
 
         for w in 0..<input.weeks {
+            let adj = adaptation.adjustment(forWeek: w)
+            let weekVdot = adaptation.vdot(forWeek: w, initial: zones.vdot)
+            let weekZones = PaceZones(vdot: weekVdot)
             let phase = phases[w]
             let samePhase = phases.indices.filter { phases[$0] == phase }
             let posInPhase = samePhase.firstIndex(of: w) ?? 0
-            let progress = Double(posInPhase) / Double(max(1, samePhase.count - 1))
-            let isRecovery = phase != .taper && (w + 1) % 4 == 0
+            var progress = Double(posInPhase) / Double(max(1, samePhase.count - 1))
+            let isRecovery = phase != .taper && (adj.recovery ?? ((w + 1) % 4 == 0))
+            if adj.freeze { progress = lastProgress }
+            if !isRecovery { lastProgress = progress }
 
             // Weekvolume
             let volume: Double
@@ -58,7 +69,7 @@ public enum PlanGenerator {
             } else if isRecovery {
                 volume = roundHalf(volumeTrend * recoveryFactor)
             } else {
-                volumeTrend = min(volumeTrend * volumeGrowth, peakVolume)
+                if !adj.freeze { volumeTrend = min(volumeTrend * volumeGrowth, peakVolume) }
                 volume = roundHalf(volumeTrend)
             }
 
@@ -68,7 +79,7 @@ public enum PlanGenerator {
                 if isRecovery {
                     longKm = roundHalf(lastLong * 0.8)
                 } else {
-                    longTrend = min(longTrend + 1, longCap)
+                    if !adj.freeze && !adj.freezeLongRun { longTrend = min(longTrend + 1, longCap) }
                     longKm = roundHalf(min(longTrend, longRunShare * volume))
                     lastLong = longKm
                 }
@@ -96,19 +107,73 @@ public enum PlanGenerator {
             }
 
             // Rustige loopjes vullen de rest van het volume op.
-            let used = workouts.reduce(0.0) { $0 + $1.estimatedDistance(zones: zones) / 1000 }
+            let used = workouts.reduce(0.0) { $0 + $1.estimatedDistance(zones: weekZones) / 1000 }
             let easyDays = days.filter { d in !workouts.contains { $0.day == d } }
             if !easyDays.isEmpty {
                 let perRun = phase == .taper ? 3 : max(3, roundHalf((volume - used) / Double(easyDays.count)))
                 for d in easyDays { workouts.append(SimpleRuns.easy(day: d, km: perRun)) }
             }
-            workouts.sort { $0.day < $1.day }
+
+            workouts = apply(adj, week: w, to: workouts, sickPeriods: adaptation.sickPeriods)
 
             let start = calendar.date(byAdding: .day, value: 7 * w, to: monday) ?? monday
             weeks.append(PlanWeek(number: w + 1, phase: phase, isRecoveryWeek: isRecovery,
-                                  startDate: start, workouts: workouts))
+                                  startDate: start, workouts: workouts, vdot: weekVdot))
         }
         return TrainingPlan(input: input, zones: zones, weeks: weeks)
+    }
+
+    /// Past extra loopjes, verplaatsingen, overrides en ziekteperiodes toe op een week.
+    static func apply(_ adj: WeekAdjustment, week: Int, to planned: [PlannedWorkout],
+                      sickPeriods: [SickPeriod]) -> [PlannedWorkout] {
+        var workouts = planned
+
+        // Extra loopjes op vrije dagen.
+        let easyKm = typicalEasyKm(planned)
+        for d in adj.extraDays where !workouts.contains(where: { $0.day == d }) {
+            workouts.append(SimpleRuns.easy(day: d, km: easyKm, isExtra: true))
+        }
+
+        // Verplaatsingen, enkel naar een vrije dag.
+        for (from, to) in adj.moves.sorted(by: { $0.key < $1.key }) {
+            guard let i = workouts.firstIndex(where: { $0.day == from }),
+                  !workouts.contains(where: { $0.day == to }) else { continue }
+            workouts[i].day = to
+        }
+
+        // Rustige loop toegevoegd door de coach.
+        for (d, km) in adj.addedEasy.sorted(by: { $0.key < $1.key })
+        where !workouts.contains(where: { $0.day == d }) {
+            workouts.append(SimpleRuns.easy(day: d, km: km))
+        }
+
+        // Overrides
+        for (d, change) in adj.overrides.sorted(by: { $0.key < $1.key }) {
+            guard let i = workouts.firstIndex(where: { $0.day == d }) else { continue }
+            switch change {
+            case .skip:
+                workouts.remove(at: i)
+            case .easy(let km):
+                workouts[i] = SimpleRuns.easy(day: d, km: km, isExtra: workouts[i].isExtra)
+            case .shorterLong(let km):
+                workouts[i] = SimpleRuns.long(day: d, km: km)
+            }
+        }
+
+        // Ziek: alles in de periode valt weg.
+        workouts.removeAll { w in
+            sickPeriods.contains { $0.contains(PlanDay(week: week, day: w.day)) }
+        }
+
+        workouts.sort { $0.day < $1.day }
+        return workouts
+    }
+
+    /// Lengte van een gewone rustige loop in deze week, tussen 3 en 5 km.
+    static func typicalEasyKm(_ workouts: [PlannedWorkout]) -> Double {
+        let easy = workouts.filter { $0.type == .easy && !$0.isExtra }.map { $0.plainKm ?? 4 }
+        let base = easy.isEmpty ? 4 : easy.reduce(0, +) / Double(easy.count)
+        return min(max(roundHalf(base), 3), 5)
     }
 
     // MARK: - Hulpfuncties
