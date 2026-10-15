@@ -35,6 +35,8 @@ Afspraken: eerst brainstormen tot het plan klopt, proof of concepts voor risicov
 
 **Na het lopen:** afstand, tijd, pace per km, routekaart, doelpace vs. echt per interval, RPE 1-10 + pijntje ja/nee, lokaal opslaan, optioneel naar Apple Health.
 
+**Extra loop deze week:** plan blijft op de vaste dagen gebouwd, maar per week kan je een rustige bonusloop (3 à 5 km) toevoegen op een vrije dag. Waarschuwing als die vlak voor een kwaliteitssessie of lange loop valt. Telt niet mee voor de opbouw. Na 3 weken op rij met een extra loop stelt de app voor om een vaste dag toe te voegen.
+
 **Plan aanpassen:** pace-zones schuiven als kwaliteitssessies structureel te snel/traag gaan, waarschuwing bij te snelle easy runs, gemiste sessies slim herschikken, "Niet 100%"-knop (ziek/pijntje/geen tijd, enkele lichtere dagen, dan terug in plan), opbouw remt af bij stelselmatig hoge RPE.
 
 **Overzicht:** weekkalender, weekvolume-grafiek, PR's, voorspelde racetijden.
@@ -68,11 +70,21 @@ Beslissingen:
 - **Opslag:** gewone `Codable`-structs als JSON, geen SwiftData (testbaar, ruim genoeg voor één gebruiker).
 - **Pace-zones via VDOT (Daniels/Gilbert-formules)**, fracties van VDOT: herstel 55-62%, rustig 62-70%, duurtempo = voorspeld marathontempo ±5 s, tempo 86-89%, interval 96-100%, snelheid 106-110%. Gecontroleerd tegen de Daniels-tabellen.
 - Startniveau: recente prestatie (≥1500 m) of Cooper-test (12 min).
+- Plan maken gebeurt in de app zelf (vragenreeks). Het testprofiel in de preview (5 km 25:00, 15 km/week, langste loop 8 km, di/do/zo) dient enkel om de logica te controleren.
+
+Regels plangenerator v1:
+- Fases: 40% opbouw, 35% zwaarder, rest piek, laatste week taper. Weken starten op maandag.
+- Volume +8% per week, piek max 1,6× startvolume (of +15 km), elke 4e week rustweek (-25%).
+- Lange loop +1 km per week, max 42% van het weekvolume, max 14 km voor 10 km-doel (12 / 20 / 30 km voor 5 km / halve / marathon).
+- Kwaliteit: 1 sessie per week. Met 4+ loopdagen een tweede (tempo) enkel in zwaarder en piek.
+- Opbouw: fartlek en korte tempo's. Zwaarder: 800 m-intervallen en tempo-km's. Piek: 3× 2 km en 2× 3 km op 10k-tempo, 1 km-intervallen, één lange loop met 2 km duurtempo. Taper: 3× 1 km op 10k-tempo + tijdrit over de doelafstand.
+- Zwaar deel begrensd: intervallen max 20%, tempo max 25% van het weekvolume.
+- Elke kwaliteitssessie: 1,5 km inlopen, 1 km uitlopen. Rustige loopjes vullen de rest van het volume (min 3 km).
+- Kwaliteitsdagen zo ver mogelijk van de lange loop en van elkaar.
 
 Stappen:
-1. ~~Pace-zones + racevoorspelling + testopzet~~ (code klaar, wacht op eerste run in Actions)
-2. Plangenerator: fases, weekvolume met rustweken, sessies verdelen over loopdagen, lange loop op gekozen dag
-3. Workout-bibliotheek: sjablonen per type en fase, geschaald naar niveau
+1. ~~Pace-zones + racevoorspelling + testopzet~~ (klaar, tests groen op 15 okt)
+2. ~~Plangenerator~~ + 3. ~~Workout-bibliotheek~~ (eerste versie, afgestemd op 10 km sneller; regels eerst in een Python-prototype uitgetest en goedgekeurd, daarna naar Swift)
 4. Adaptatieregels (zones schuiven, RPE-rem, gemiste sessies, "Niet 100%")
 5. Datamodel voor opslag en schermstructuur
 
@@ -83,8 +95,13 @@ Bestanden LoopCore:
 | `Sources/LoopCore/Vdot.swift` | VDOT uit prestatie/Cooper-test, voorspelde tijden en tempo's |
 | `Sources/LoopCore/PaceZones.swift` | `PaceZone`, `PaceRange` (afwijking te snel/traag), `PaceZones` (+ `adjusted(byVdot:)`) |
 | `Sources/LoopCore/TimeText.swift` | Tijd, tempo, afstand als tekst |
-| `Sources/PlanPreview/main.swift` | Preview voor testprofiel Louis (5 km in 25:00) |
-| `Tests/LoopCoreTests/*.swift` | Tests tegen Daniels-tabellen, volgorde zones, Codable, tekstopmaak |
+| `Sources/LoopCore/PlanModels.swift` | Datamodel: `Weekday`, `PlanInput`, `Phase`, `WorkoutType`, `WorkoutStep`/`WorkoutBlock`, `PlannedWorkout`, `PlanWeek`, `TrainingPlan`, `PlanCalendar` |
+| `Sources/LoopCore/WorkoutLibrary.swift` | `QualitySession`-sjablonen, `SimpleRuns` (rustig, lang, progressie, tijdrit) |
+| `Sources/LoopCore/PlanGenerator.swift` | De plangenerator met bovenstaande regels |
+| `Sources/LoopCore/ExtraRun.swift` | Extra loop toevoegen/verwijderen, waarschuwing, voorstel vaste dag |
+| `Sources/LoopCore/WorkoutText.swift` | NL-omschrijving van workouts |
+| `Sources/PlanPreview/main.swift` | Preview: zones, volledig 12-weken-plan, voorbeeld extra loop, vergelijking 4 dagen |
+| `Tests/LoopCoreTests/*.swift` | Tests tegen Daniels-tabellen en het Python-prototype, structuur plan, extra loop, Codable |
 
 ## Status (15 oktober 2026)
 - ✅ GitHub Actions-build slaagt, `LoopTest.ipa` staat in Releases
@@ -95,4 +112,4 @@ Bestanden LoopCore:
 - Nog niet getest: GPS met scherm uit, kwaliteit van de cues.
 
 ## Volgende stap
-Eerste run van `LoopCore tests` in Actions controleren (groen + preview in Summary). Daarna fase 4 stap 2: de plangenerator, met een volledig 10 km-plan voor Louis in de preview.
+Run van `LoopCore tests` met de plangenerator controleren (groen + volledig plan in Summary). Daarna fase 4 stap 4: adaptatieregels (zones schuiven op basis van gelopen tempo's, RPE-rem, gemiste sessies, "Niet 100%").
