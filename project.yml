@@ -1,5 +1,5 @@
 # XcodeGen-config: GitHub Actions maakt hiermee het Xcode-project aan.
-name: LoopTest
+name: LoopApp
 options:
   bundleIdPrefix: com.loudecuyper
   deploymentTarget:
@@ -7,21 +7,26 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.2"
+    CURRENT_PROJECT_VERSION: "2"
+packages:
+  LoopCore:
+    path: LoopCore
 targets:
-  LoopTest:
+  LoopApp:
     type: application
     platform: iOS
     sources:
-      - path: LoopTest
+      - path: LoopApp
         excludes:
           - Info.plist
+    dependencies:
+      - package: LoopCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.loudecuyper.looptest
-        PRODUCT_NAME: LoopTest
-        INFOPLIST_FILE: LoopTest/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.loudecuyper.loopapp
+        PRODUCT_NAME: LoopApp
+        INFOPLIST_FILE: LoopApp/Info.plist
         GENERATE_INFOPLIST_FILE: "NO"
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Manual

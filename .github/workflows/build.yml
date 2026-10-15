@@ -1,13 +1,13 @@
-# Bouwt bij elke push een (niet-ondertekende) LoopTest.ipa.
+# Bouwt bij elke push een (niet-ondertekende) LoopApp.ipa.
 # SideStore ondertekent hem daarna met je eigen Apple ID.
-# Wijzigingen enkel in LoopCore of tekstbestanden maken geen nieuwe ipa.
+# De app gebruikt LoopCore, dus ook wijzigingen daar maken een nieuwe ipa.
+# Enkel tekstbestanden of de LoopCore-testworkflow wijzigen maakt geen nieuwe ipa.
 name: Build IPA
 
 on:
   push:
     branches: [main]
     paths-ignore:
-      - "LoopCore/**"
       - ".github/workflows/core.yml"
       - "**.md"
   workflow_dispatch:
@@ -30,8 +30,8 @@ jobs:
       - name: App bouwen
         run: |
           xcodebuild \
-            -project LoopTest.xcodeproj \
-            -scheme LoopTest \
+            -project LoopApp.xcodeproj \
+            -scheme LoopApp \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
@@ -39,7 +39,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             build > build.log 2>&1 || {
               echo "::error::Build mislukt, fouten hieronder"
-              grep -E "error:" build.log | head -n 40
+              grep -E "error:" build.log | head -n 60
               tail -n 40 build.log
               exit 1
             }
@@ -48,20 +48,20 @@ jobs:
       - name: IPA maken
         run: |
           mkdir -p Payload
-          cp -R build/Build/Products/Release-iphoneos/LoopTest.app Payload/
-          zip -qry LoopTest.ipa Payload
-          ls -lh LoopTest.ipa
+          cp -R build/Build/Products/Release-iphoneos/LoopApp.app Payload/
+          zip -qry LoopApp.ipa Payload
+          ls -lh LoopApp.ipa
 
       - name: Uploaden als artifact
         uses: actions/upload-artifact@v4
         with:
-          name: LoopTest-ipa
-          path: LoopTest.ipa
+          name: LoopApp-ipa
+          path: LoopApp.ipa
 
       - name: Publiceren als release (makkelijk downloaden op je iPhone)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: LoopTest build ${{ github.run_number }}
-          files: LoopTest.ipa
+          name: LoopApp build ${{ github.run_number }}
+          files: LoopApp.ipa
           make_latest: true

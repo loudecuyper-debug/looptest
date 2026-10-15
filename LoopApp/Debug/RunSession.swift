@@ -3,7 +3,8 @@ import CoreLocation
 import UIKit
 import Combine
 
-/// Koppelt GPS, klok en audio aan de CueEngine en houdt diagnose bij.
+/// Proof of concept: koppelt GPS, klok en audio aan de CueEngine en houdt diagnose bij.
+/// Bereikbaar via Instellingen › Diagnose. Wordt in de volgende stap de basis van het echte lopen.
 final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
     enum Phase { case idle, countdown, running, finished }
 
@@ -22,7 +23,7 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var results: [SegmentResult] = []
     @Published var log: [String] = []
 
-    // Diagnose voor de proof of concept
+    // Diagnose
     @Published var pointsTotal = 0
     @Published var pointsBackground = 0
     @Published var maxGap: TimeInterval = 0
@@ -55,6 +56,11 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
                        name: UIApplication.didEnterBackgroundNotification, object: nil)
         nc.addObserver(self, selector: #selector(willEnterForeground),
                        name: UIApplication.willEnterForegroundNotification, object: nil)
+    }
+
+    deinit {
+        timer?.invalidate()
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Bediening
@@ -146,7 +152,7 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
         results.append(contentsOf: out.finishedSegments)
 
         if out.workoutFinished {
-            finish(spoken: "Test klaar. Je liep \(Format.spokenDistance(distance)) in \(Format.spokenDuration(now)). Goed gedaan.")
+            finish(spoken: "Test klaar. Je liep \(Format.spokenDistance(distance)) in \(Format.spokenDuration(now)).")
             return
         }
         out.cues.forEach { speaker.speak($0) }
@@ -213,12 +219,12 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         switch manager.authorizationStatus {
         case .denied, .restricted:
-            authProblem = "Locatietoegang staat uit. Zet hem aan via Instellingen › LoopTest › Locatie."
+            authProblem = "Locatietoegang staat uit. Zet hem aan via Instellingen › LoopApp › Locatie."
         default:
             authProblem = nil
         }
         if manager.accuracyAuthorization == .reducedAccuracy {
-            authProblem = "Zet 'Exacte locatie' aan via Instellingen › LoopTest › Locatie."
+            authProblem = "Zet 'Exacte locatie' aan via Instellingen › LoopApp › Locatie."
         }
     }
 

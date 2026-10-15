@@ -7,16 +7,35 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
     private let session = AVAudioSession.sharedInstance()
     private var pending = 0
     let voice: AVSpeechSynthesisVoice?
+    /// 1 = normaal spreektempo, 0,9 = trager, 1,1 = sneller.
+    var rateFactor: Float = 1
     var onLog: ((String) -> Void)?
 
-    override init() {
-        // Beste Nederlandse stem kiezen: hoogste kwaliteit eerst, bij gelijke kwaliteit nl-BE.
+    /// Beste Nederlandse stem: hoogste kwaliteit eerst, bij gelijke kwaliteit nl-BE.
+    static func bestVoice() -> AVSpeechSynthesisVoice? {
         let dutch = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix("nl") }
         let sorted = dutch.sorted { a, b in
             if a.quality.rawValue != b.quality.rawValue { return a.quality.rawValue > b.quality.rawValue }
             return a.language == "nl-BE" && b.language != "nl-BE"
         }
-        voice = sorted.first ?? AVSpeechSynthesisVoice(language: "nl-BE") ?? AVSpeechSynthesisVoice(language: "nl-NL")
+        return sorted.first ?? AVSpeechSynthesisVoice(language: "nl-BE") ?? AVSpeechSynthesisVoice(language: "nl-NL")
+    }
+
+    /// Bv. "Ellen · België · verbeterd".
+    static func describe(_ v: AVSpeechSynthesisVoice?) -> String {
+        guard let v else { return "Geen Nederlandse stem gevonden" }
+        let q: String
+        switch v.quality {
+        case .premium: q = "premium"
+        case .enhanced: q = "verbeterd"
+        default: q = "standaard"
+        }
+        let region = v.language == "nl-BE" ? "België" : "Nederland"
+        return "\(v.name) · \(region) · \(q)"
+    }
+
+    override init() {
+        voice = Speaker.bestVoice()
         super.init()
         synth.delegate = self
         do {
@@ -27,16 +46,7 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
         }
     }
 
-    var voiceDescription: String {
-        guard let v = voice else { return "geen Nederlandse stem gevonden" }
-        let q: String
-        switch v.quality {
-        case .premium: q = "premium"
-        case .enhanced: q = "verbeterd"
-        default: q = "standaard"
-        }
-        return "\(v.name) (\(v.language), \(q))"
-    }
+    var voiceDescription: String { Speaker.describe(voice) }
 
     func speak(_ text: String) {
         do {
@@ -46,7 +56,7 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
         }
         let u = AVSpeechUtterance(string: text)
         u.voice = voice
-        u.rate = AVSpeechUtteranceDefaultSpeechRate
+        u.rate = AVSpeechUtteranceDefaultSpeechRate * rateFactor
         u.preUtteranceDelay = 0.15
         pending += 1
         synth.speak(u)

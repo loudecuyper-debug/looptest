@@ -112,7 +112,7 @@ public enum NotFeelingReason: String, Codable, CaseIterable, Sendable {
     public var name: String {
         switch self {
         case .sick: return "Ziek"
-        case .pain: return "Pijntje"
+        case .pain: return "Pijn"
         case .noTime: return "Geen tijd"
         case .tired: return "Moe"
         }
@@ -137,7 +137,7 @@ public struct LevelSuggestion: Codable, Equatable, Sendable {
     }
 }
 
-/// Wat de coach je laat weten.
+/// Wat de coach je laat weten. Toon: zakelijk en feitelijk, zonder verkleinwoorden.
 public enum CoachEvent: Equatable, Sendable {
     case levelSuggestion(LevelSuggestion)
     case testResult(oldVdot: Double, newVdot: Double, predicted10k: TimeInterval)
@@ -163,34 +163,34 @@ public enum CoachEvent: Equatable, Sendable {
             let lvl = { (v: Double) in String(format: "%.1f", v).replacingOccurrences(of: ".", with: ",") }
             return "Tijdrit verwerkt: niveau van \(lvl(old)) naar \(lvl(new)). Voorspelde 10 km: \(TimeText.clock(t))."
         case .easyTooFastTip:
-            return "Tip: deze rustige loop was sneller dan nodig."
+            return "Deze rustige loop was sneller dan je rustige zone."
         case .easyTooFastWarning:
-            return "3 van je laatste 5 rustige loopjes waren te snel. Rustig lopen bouwt je basis op, hou je in."
+            return "3 van je laatste 5 rustige loopjes waren sneller dan je rustige zone. Rustige kilometers bouwen je basis op, hou het tempo lager."
         case .painNextRunEasy:
-            return "Pijntje genoteerd: je volgende loop wordt rustig en korter."
+            return "Pijn gemeld: je volgende loop wordt een korte rustige loop van maximaal 30 minuten."
         case .suggestNotFeeling:
-            return "Al twee keer pijn deze week. Wil je \"Niet 100%\" aanzetten voor een paar lichtere dagen?"
+            return "Twee keer pijn gemeld binnen 7 dagen. Zet \"Niet 100%\" aan voor enkele lichtere dagen."
         case .sessionMoved(let title, let to):
             return "\(title) verplaatst naar \(to.name)."
         case .sessionDropped(let title):
-            return "\(title) valt deze week weg, er was geen goede dag meer vrij."
+            return "\(title) vervalt deze week: er is geen geschikte dag meer vrij."
         case .longRunNotGrowing(let w):
             return "Lange loop gemist: in week \(w + 1) wordt hij niet langer."
         case .weekNotCounted(let w, let missed):
             return "\(missed) sessies gemist: week \(w + 1) telt niet mee voor de opbouw."
         case .growthPaused(let w):
-            return "De week voelde zwaar: week \(w + 1) bouwt niet verder op."
+            return "De week was zwaarder dan verwacht: week \(w + 1) bouwt niet verder op."
         case .recoveryEarlier(let w):
             return "Twee weken op rij zwaarder dan verwacht: de rustweek komt vroeger, in week \(w + 1)."
         case .notFeelingApplied(let r):
             switch r {
-            case .sick: return "Beterschap! Je loopjes staan op pauze tot je aanduidt dat je beter bent."
+            case .sick: return "Je trainingen staan op pauze tot je aangeeft dat je hersteld bent."
             case .pain: return "De komende 3 dagen enkel korte rustige loopjes."
             case .noTime: return "Deze week enkel je kwaliteitssessie en een kortere lange loop."
             case .tired: return "Vandaag wordt een rustige loop."
             }
         case .backToPlan:
-            return "Fijn dat je beter bent! Eerst 3 dagen rustig, daarna pik je het plan terug op."
+            return "Hersteld genoteerd. Eerst 3 rustige dagen, daarna volg je het plan opnieuw."
         }
     }
 }

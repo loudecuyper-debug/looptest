@@ -1,7 +1,7 @@
 import Foundation
 
-// Pure logica (enkel Foundation): workout-opbouw, cue-timing en Nederlandse teksten.
-// Bewust los van GPS en audio, zodat dit later het "plan-brein" kan worden.
+// Proof of concept (LoopTest): workout-opbouw, cue-timing en Nederlandse teksten
+// voor de intervaltest onder Instellingen › Diagnose. De echte app gebruikt LoopCore.
 
 enum SegmentKind {
     case fast, walk, free

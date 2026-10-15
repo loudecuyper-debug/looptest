@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>nl</string>
 	<key>CFBundleDisplayName</key>
-	<string>LoopTest</string>
+	<string>LoopApp</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -22,10 +22,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>LoopTest gebruikt je locatie om je afstand, tempo en route tijdens het lopen te meten.</string>
+	<string>LoopApp gebruikt je locatie om je afstand, tempo en route tijdens het lopen te meten.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>LoopTest gebruikt je locatie om je loopje te blijven meten terwijl je scherm vergrendeld is.</string>
+	<string>LoopApp gebruikt je locatie om je loop te blijven meten terwijl je scherm vergrendeld is.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
@@ -46,5 +48,7 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
 </dict>
 </plist>
