@@ -77,6 +77,32 @@ struct CueEngine {
         }
     }
 
+    /// Kort label voor de Live Activity, bv. "SNEL · 2 VAN 3".
+    func label(for i: Int) -> String {
+        guard i < plan.segments.count else { return "KLAAR" }
+        switch plan.segments[i].kind {
+        case .fast: return "SNEL · \(fastNumber(i)) VAN \(plan.fastCount)"
+        case .walk: return "WANDELEN"
+        case .free: return "VRIJ LOPEN"
+        }
+    }
+
+    /// Wat er na het huidige blok komt, bv. "Daarna: wandelen, 1:00". Nil bij het laatste blok.
+    var nextText: String? {
+        let i = index + 1
+        guard i < plan.segments.count else { return nil }
+        let seg = plan.segments[i]
+        let dur = seg.duration.map { ", " + Format.clock($0) } ?? ""
+        switch seg.kind {
+        case .fast: return "Daarna: snel \(fastNumber(i)) van \(plan.fastCount)\(dur)"
+        case .walk: return "Daarna: wandelen\(dur)"
+        case .free: return "Daarna: vrij lopen"
+        }
+    }
+
+    /// Of het huidige blok overgeslagen kan worden (enkel blokken met een vaste duur).
+    var canSkip: Bool { !finished && current?.duration != nil }
+
     private func fastNumber(_ i: Int) -> Int {
         plan.segments[0...i].filter { $0.kind == .fast }.count
     }
@@ -134,6 +160,18 @@ struct CueEngine {
             }
         }
         return out
+    }
+
+    /// Huidig blok nu afsluiten en naar het volgende gaan.
+    /// Geeft het afgesloten blok terug, de cue voor het nieuwe blok, en of de workout daarmee klaar is.
+    mutating func skip(elapsed: TimeInterval, distance: Double) -> (result: SegmentResult?, cue: String?, finished: Bool) {
+        guard canSkip else { return (nil, nil, false) }
+        let result = closeSegment(endElapsed: max(elapsed, segStartElapsed), distance: distance)
+        if current != nil {
+            return (result, "Blok overgeslagen. " + intro(index), false)
+        }
+        finished = true
+        return (result, nil, true)
     }
 
     /// Workout vroegtijdig stoppen: lopend blok afsluiten.

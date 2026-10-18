@@ -49,6 +49,7 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/LoopApp.app Payload/
+          echo "Extensies in de app:"; ls Payload/LoopApp.app/PlugIns || echo "geen extensies gevonden"
           zip -qry LoopApp.ipa Payload
           ls -lh LoopApp.ipa
 

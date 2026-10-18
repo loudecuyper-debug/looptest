@@ -2,6 +2,7 @@ import Foundation
 import CoreLocation
 import UIKit
 import Combine
+import ActivityKit
 
 /// Proof of concept: koppelt GPS, klok en audio aan de CueEngine en houdt diagnose bij.
 /// Bereikbaar via Instellingen › Diagnose. Wordt in de volgende stap de basis van het echte lopen.
@@ -17,6 +18,8 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var segmentTitle = ""
     @Published var segmentRemaining: TimeInterval?
     @Published var countdownLeft = 0
+    @Published var paused = false
+    @Published var canSkip = false
     @Published var gpsAccuracy: Double?
     @Published var authProblem: String?
     @Published var route: [CLLocationCoordinate2D] = []
@@ -39,6 +42,9 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
     private var lastPointTime: Date?
     private var samples: [(t: TimeInterval, d: Double)] = []
     private var bgEnteredAt: Date?
+    private var pausedAt: Date?
+    private var activity: Activity<RunActivityAttributes>?
+    private var lastActivityUpdate = Date.distantPast
 
     var voiceDescription: String { speaker.voiceDescription }
 
@@ -84,6 +90,61 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
         countdownLeft = 10
         speaker.speak("Start over 10 seconden. Je mag je scherm nu vergrendelen.")
         startTimer()
+
+        // Knoppen op het vergrendelscherm komen hier binnen.
+        RunControlCenter.handler = { [weak self] control in self?.handle(control) }
+        startActivity()
+    }
+
+    // MARK: - Pauze en overslaan
+
+    func pause() {
+        guard phase == .running, !paused else { return }
+        elapsed = currentElapsed()
+        pausedAt = Date()
+        paused = true
+        speaker.speak("Gepauzeerd.")
+        addLog("Gepauzeerd")
+        updateActivity(force: true)
+    }
+
+    func resume() {
+        guard phase == .running, paused, let p = pausedAt, let s = startDate else { return }
+        startDate = s.addingTimeInterval(Date().timeIntervalSince(p))
+        pausedAt = nil
+        paused = false
+        lastLocation = nil   // stuk tijdens de pauze telt niet mee
+        speaker.speak("Verder.")
+        addLog("Hervat")
+        update()
+        updateActivity(force: true)
+    }
+
+    func skipBlock() {
+        guard phase == .running, !paused, var e = engine else { return }
+        let now = currentElapsed()
+        let out = e.skip(elapsed: now, distance: distance)
+        engine = e
+        if let r = out.result { results.append(r) }
+        addLog("Blok overgeslagen")
+        if out.finished {
+            elapsed = now
+            finish(spoken: "Test klaar. Je liep \(Format.spokenDistance(distance)) in \(Format.spokenDuration(now)).")
+            return
+        }
+        if let cue = out.cue { speaker.speak(cue) }
+        update()
+        updateActivity(force: true)
+    }
+
+    private func handle(_ control: RunControl) {
+        addLog("Knop vergrendelscherm: \(control.rawValue)")
+        switch control {
+        case .pause: pause()
+        case .resume: resume()
+        case .skip: skipBlock()
+        case .stop: stopEarly()
+        }
     }
 
     func stopEarly() {
@@ -99,6 +160,7 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     func reset() {
         speaker.stopAll()
+        endActivity(immediately: true)
         resetState()
         phase = .idle
     }
@@ -119,7 +181,7 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
             if countdownLeft == 3 { speaker.speak("3, 2, 1") }
             if countdownLeft <= 0 { beginRunning() }
         case .running:
-            update()
+            if !paused { update() }
         default:
             break
         }
@@ -134,15 +196,17 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
         speaker.speak(e.start())
         engine = e
         update()
+        updateActivity(force: true)
     }
 
+    /// Looptijd zonder pauzes.
     private func currentElapsed() -> TimeInterval {
         guard let s = startDate else { return 0 }
-        return Date().timeIntervalSince(s)
+        return (pausedAt ?? Date()).timeIntervalSince(s)
     }
 
     private func update() {
-        guard phase == .running, var e = engine else { return }
+        guard phase == .running, !paused, var e = engine else { return }
         let now = currentElapsed()
         elapsed = now
         currentPace = Format.rollingPace(samples: samples, now: now)
@@ -158,6 +222,9 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
         out.cues.forEach { speaker.speak($0) }
         segmentTitle = e.title(for: e.index)
         segmentRemaining = e.remaining(elapsed: now)
+        canSkip = e.canSkip
+        // Bij een nieuw blok meteen bijwerken, anders hooguit om de 5 seconden.
+        updateActivity(force: !out.finishedSegments.isEmpty)
     }
 
     private func finish(spoken: String) {
@@ -172,7 +239,11 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
             bgEnteredAt = Date()
         }
         speaker.speak(spoken)
+        paused = false
+        pausedAt = nil
         phase = .finished
+        endActivity(immediately: false)
+        RunControlCenter.handler = nil
     }
 
     private func resetState() {
@@ -180,6 +251,9 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
         timer = nil
         engine = nil
         startDate = nil
+        pausedAt = nil
+        paused = false
+        canSkip = false
         elapsed = 0
         distance = 0
         currentPace = nil
@@ -234,7 +308,7 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         for loc in locations { handle(loc) }
-        if phase == .running { update() }
+        if phase == .running && !paused { update() }
     }
 
     private func handle(_ loc: CLLocation) {
@@ -248,6 +322,7 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
             lastLocation = loc
             return
         }
+        guard !paused else { return }   // tijdens een pauze niets meten
 
         pointsTotal += 1
         if UIApplication.shared.applicationState == .background { pointsBackground += 1 }
@@ -268,6 +343,74 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
         lastLocation = loc
         route.append(loc.coordinate)
         samples.append((t: currentElapsed(), d: distance))
+    }
+
+    // MARK: - Live Activity
+
+    private func startActivity() {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            addLog("Live Activities staan uit (Instellingen › Runner › Live Activities)")
+            return
+        }
+        do {
+            activity = try Activity.request(
+                attributes: RunActivityAttributes(workoutName: planName),
+                content: ActivityContent(state: activityState(), staleDate: nil),
+                pushType: nil)
+            addLog("Live Activity gestart")
+        } catch {
+            addLog("Live Activity mislukt: \(error.localizedDescription)")
+        }
+    }
+
+    private func updateActivity(force: Bool = false) {
+        guard let activity else { return }
+        let now = Date()
+        guard force || now.timeIntervalSince(lastActivityUpdate) >= 5 else { return }
+        lastActivityUpdate = now
+        let content = ActivityContent(state: activityState(), staleDate: nil)
+        Task { await activity.update(content) }
+    }
+
+    /// Op het einde blijft de samenvatting nog 15 minuten op het vergrendelscherm staan.
+    private func endActivity(immediately: Bool) {
+        guard let activity else { return }
+        self.activity = nil
+        let content = ActivityContent(state: activityState(), staleDate: nil)
+        let policy: ActivityUIDismissalPolicy = immediately ? .immediate : .after(Date().addingTimeInterval(15 * 60))
+        Task { await activity.end(content, dismissalPolicy: policy) }
+    }
+
+    private func activityState() -> RunActivityAttributes.ContentState {
+        let now = Date()
+        let run = phase == .finished ? elapsed : currentElapsed()
+        let e = engine
+        let remaining = e?.remaining(elapsed: run)
+
+        var title = e.map { $0.label(for: $0.index) } ?? planName.uppercased()
+        var blockEnd: Date? = nil
+        var runStart = startDate ?? now
+        if phase == .countdown {
+            // Tijdens het aftellen telt de klok af naar de start.
+            title = "START OVER"
+            blockEnd = now.addingTimeInterval(TimeInterval(max(countdownLeft, 0)))
+            runStart = blockEnd ?? now
+        } else if !paused, let remaining {
+            blockEnd = now.addingTimeInterval(remaining)
+        }
+
+        return RunActivityAttributes.ContentState(
+            blockTitle: title,
+            nextTitle: phase == .countdown ? e.map { "Eerst: " + $0.label(for: 0).lowercased() } : e?.nextText,
+            blockEnd: blockEnd,
+            blockRemainingText: remaining.map { Format.clock($0) },
+            runStart: runStart,
+            elapsedText: Format.clock(run),
+            distanceText: Format.km(distance),
+            paceText: Format.paceShort(currentPace),
+            paused: paused,
+            finished: phase == .finished,
+            canSkip: phase == .running && !paused && (e?.canSkip ?? false))
     }
 
     // MARK: - Log

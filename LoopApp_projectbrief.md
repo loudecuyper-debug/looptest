@@ -56,6 +56,11 @@ Afspraken: eerst brainstormen tot het plan klopt, proof of concepts voor risicov
 
 **Native extra's in v1:** kadans via bewegingssensor (ook treadmill zonder GPS), lokale meldingen ("morgen: 6×400 m"), widget met workout van vandaag.
 
+**Toegevoegd 18 okt (wens van Louis):**
+- **Live Activity** op het vergrendelscherm en in het Dynamic Island tijdens het lopen: huidig blok ("SNEL · 2 VAN 3") met resterende tijd (telt zelf af), volgend blok, totale tijd, afstand, tempo. Knoppen: Pauze en Blok overslaan tijdens het lopen, Hervat en Stop tijdens een pauze (Stop enkel bij pauze, tegen per ongeluk stoppen in de zak). Starten kan niet vanaf een Live Activity; later eventueel via bedieningspaneel of actieknop.
+- **Routekaart** in Voortgang: alle gelopen GPS-routes als dunne oranje lijnen op een donkere kaart (vaak gelopen straten kleuren feller door overlap), filter alles / dit jaar / deze maand, tik op een route om de loop te openen. Gebruikt de bewaarde `RouteTrack`, niets nieuws op te slaan.
+- Later (extra): zelf routes plannen op de kaart (punten aantikken, route volgt straten via Apple Kaarten, afstand live, "terug naar start").
+
 **Later:** schoenen bijhouden (km per paar, melding rond 600 à 800 km), hitte-aanpassing (weer-API), krachttraining, meerdere plannen na elkaar + herstelblok na race, import uit Apple Health, Siri/actieknop.
 
 **Niet:** sociale features, racedatabase, smartwatch, AI-briefings.
@@ -187,6 +192,13 @@ UI-ronde 18 okt (na eerste test op de iPhone, tekening goedgekeurd door Louis):
 - Stem: Louis verkiest **Xander (Enhanced, nl-NL)** boven Ellen; de app kiest hem automatisch zolang Ellen Enhanced niet geïnstalleerd is.
 - Controle: Swift-syntax met tree-sitter in Claude's werkruimte (geen Swift-compiler), echte build in Actions.
 
+Live Activity-proef (18 okt, in Diagnose, nog te testen op de iPhone):
+- Nieuwe extensie `RunnerWidgets` (app-extension, bundle `com.loudecuyper.loopapp.widgets`, ingebed in de app, zelfde instellingen zonder ondertekening). Krijgt later ook de widget "training van vandaag".
+- Gedeeld bestand `LoopApp/LiveActivity/RunActivity.swift` (in beide targets): `RunActivityAttributes` met `ContentState` (bloklabel, volgend blok, `blockEnd` zodat de klok zelf aftelt, `runStart` gecorrigeerd voor pauzes, afstand, tempo, gepauzeerd, klaar, `canSkip`) en de knoppen als `LiveActivityIntent` (Pauze, Hervat, Overslaan, Stop). Die lopen in het proces van de app en komen binnen via `RunControlCenter.handler`; geen App Group nodig.
+- `RunSession` (Diagnose) kreeg pauze, hervatten en blok overslaan (afstand telt niet tijdens pauze), start de Live Activity bij de start (moet op de voorgrond), werkt hem bij bij elk nieuw blok en anders hooguit om de 5 s, en laat de samenvatting nog 15 min staan. Ook in de app zelf knoppen Pauze/Hervat en Overslaan.
+- `Info.plist`: `NSSupportsLiveActivities`. Versie 0.4 (build 4). Build-log toont welke extensies in de app zitten.
+- Te testen: installeren met iloader (de extensie krijgt een eigen app-ID; met een gratis Apple ID max 10 nieuwe app-ID's per 7 dagen), verschijnt de Live Activity, telt de klok, werken de knoppen met scherm vergrendeld.
+
 Stap 2 (lopen), plan goedgekeurd 15 okt:
 - Kadans komt mee (bewegingssensor, extra toestemming). Live stats op het vergrendelscherm later, samen met de widget (vraagt een extra extensie).
 - **Volgorde (beslist 15 okt):** eerst de `WorkoutEngine` in LoopCore (testbaar in Actions). Loopscherm, `RunTracker` (GPS, klok, stem, kadans), Na de loop en gemiste sessies/`finishWeek` pas na de PoC-test op de iPhone, zodat dat deel op een bewezen basis gebouwd wordt.
@@ -244,6 +256,7 @@ Bestanden app (`LoopApp/`):
 **Gratis alternatieven bekeken (16 okt), voor als iloader ooit niet meer werkt:** Xcode op de Mac van Louis' vriendin (Personal Team, gratis, geen last van anisette) zou werken, maar valt af: te weinig schijfruimte (Xcode vraagt 30 à 40 GB). Valt ook af: PWA (geen GPS met scherm uit), macOS-VM op Windows, EU-route met alternatieve appwinkels (vraagt betaald account), TrollStore (enkel oude iOS), eigen anisette-server (veel werk, onzeker, risico op blokkade). Betaald account: nee.
 
 ## Volgende stap
+0b. Live Activity-proef testen (Diagnose › intervaltest, thuis). Gaat het goed: loopscherm (stap 2) met Live Activity en de routekaart bouwen, zodat Louis ze dinsdag 20 okt kan testen tijdens de eerste plantraining.
 0. Naam en icoon pushen, nieuwe `LoopApp.ipa` installeren via iloader (Import IPA over de bestaande app heen, gegevens blijven), icoon en naam controleren.
 1. Onboarding doorlopen met echte gegevens en de schermen van stap 1 op het toestel bekijken (opmerkingen en screenshots noteren).
 2. **Diagnose testen** (Instellingen › Diagnose): intervaltest en minstens 2 km vrij lopen, telkens met muziek aan en scherm vergrendeld. Daarna screenshots van diagnose en logboek, plus hoe de cues klonken en of de muziek stiller ging.

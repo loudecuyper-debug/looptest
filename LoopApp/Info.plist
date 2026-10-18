@@ -24,6 +24,8 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<false/>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Runner gebruikt je locatie om je afstand, tempo en route tijdens het lopen te meten.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

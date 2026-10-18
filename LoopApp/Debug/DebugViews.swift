@@ -41,6 +41,7 @@ struct DebugStartView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Label("Zet eerst Spotify of Apple Music aan", systemImage: "music.note")
                 Label("Start, vergrendel je scherm, steek je gsm weg", systemImage: "lock.fill")
+                Label("Op je vergrendelscherm: blok, tijd, afstand, pauze en overslaan", systemImage: "rectangle.on.rectangle")
                 Label("Bekijk na afloop de diagnose", systemImage: "checkmark.seal")
             }
             .font(.callout)
@@ -114,6 +115,30 @@ struct DebugLiveView: View {
                 }
                 gpsBadge
                 Spacer()
+
+                HStack(spacing: 10) {
+                    Button {
+                        session.paused ? session.resume() : session.pause()
+                    } label: {
+                        Label(session.paused ? "Hervat" : "Pauze",
+                              systemImage: session.paused ? "play.fill" : "pause.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button {
+                        session.skipBlock()
+                    } label: {
+                        Label("Overslaan", systemImage: "forward.end.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!session.canSkip || session.paused)
+                }
             }
 
             Button(role: .destructive) {

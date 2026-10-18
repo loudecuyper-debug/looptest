@@ -7,8 +7,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.3"
-    CURRENT_PROJECT_VERSION: "3"
+    MARKETING_VERSION: "0.4"
+    CURRENT_PROJECT_VERSION: "4"
 packages:
   LoopCore:
     path: LoopCore
@@ -22,6 +22,7 @@ targets:
           - Info.plist
     dependencies:
       - package: LoopCore
+      - target: RunnerWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.loudecuyper.loopapp
@@ -35,3 +36,25 @@ targets:
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGN_IDENTITY: ""
     scheme: {}
+  RunnerWidgets:
+    # Widget-extensie: Live Activity tijdens het lopen (later ook de widget van vandaag).
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RunnerWidgets
+        excludes:
+          - Info.plist
+      - path: LoopApp/LiveActivity
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.loudecuyper.loopapp.widgets
+        PRODUCT_NAME: RunnerWidgets
+        INFOPLIST_FILE: RunnerWidgets/Info.plist
+        GENERATE_INFOPLIST_FILE: "NO"
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: "YES"
+        APPLICATION_EXTENSION_API_ONLY: "YES"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGN_IDENTITY: ""
