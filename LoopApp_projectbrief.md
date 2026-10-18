@@ -59,7 +59,7 @@ Afspraken: eerst brainstormen tot het plan klopt, proof of concepts voor risicov
 **Toegevoegd 18 okt (wens van Louis):**
 - **Live Activity** op het vergrendelscherm en in het Dynamic Island tijdens het lopen: huidig blok ("SNEL · 2 VAN 3") met resterende tijd (telt zelf af), volgend blok, totale tijd, afstand, tempo. Knoppen: Pauze en Blok overslaan tijdens het lopen, Hervat en Stop tijdens een pauze (Stop enkel bij pauze, tegen per ongeluk stoppen in de zak). Starten kan niet vanaf een Live Activity; later eventueel via bedieningspaneel of actieknop.
 - **Routekaart** in Voortgang: alle gelopen GPS-routes als dunne oranje lijnen op een donkere kaart (vaak gelopen straten kleuren feller door overlap), filter alles / dit jaar / deze maand, tik op een route om de loop te openen. Gebruikt de bewaarde `RouteTrack`, niets nieuws op te slaan.
-- Later (extra): zelf routes plannen op de kaart (punten aantikken, route volgt straten via Apple Kaarten, afstand live, "terug naar start").
+- **Routes plannen** (op vraag van Louis meteen mee gebouwd, 18 okt): punten aantikken, elk stuk volgt straten en paden via Apple Kaarten (wandelroute), afstand en geschatte duur op rustig tempo live, Terug, Naar start, Wissen, bewaren met naam.
 
 **Later:** schoenen bijhouden (km per paar, melding rond 600 à 800 km), hitte-aanpassing (weer-API), krachttraining, meerdere plannen na elkaar + herstelblok na race, import uit Apple Health, Siri/actieknop.
 
@@ -199,6 +199,12 @@ Live Activity-proef (18 okt, in Diagnose, nog te testen op de iPhone):
 - `Info.plist`: `NSSupportsLiveActivities`. Versie 0.4 (build 4). Build-log toont welke extensies in de app zitten.
 - Te testen: installeren met iloader (de extensie krijgt een eigen app-ID; met een gratis Apple ID max 10 nieuwe app-ID's per 7 dagen), verschijnt de Live Activity, telt de klok, werken de knoppen met scherm vergrendeld.
 
+Routekaart en routes plannen (18 okt, nog te testen op de iPhone):
+- Ingang: kaart "Routekaart" in Voortgang. Scherm `Map/RoutesMapView.swift` met schakelaar **Gelopen / Plannen**, donkere gedempte kaart zonder winkels, knoppen voor je locatie, kompas en schaal.
+- Gelopen: alle loopjes met GPS-route als oranje lijnen (uitgedund tot ±8 m tussen punten), filter Alles / Dit jaar / Deze maand, tik op of vlak naast een route (±24 punten op het scherm) om ze wit te markeren met afstand, tijd en tempo. Vult zich pas met de loopjes die het echte loopscherm (stap 2) bewaart; Diagnose bewaart geen loopjes.
+- Plannen: `RoutePlanner` vraagt per stuk een wandelroute aan `MKDirections`; zonder netwerk wordt dat stuk een rechte lijn met een melding. Bewaarde routes als chips onderaan (tik = tonen, lang drukken = verwijderen); bewerken van een bewaarde route begint van het laatste punt, opnieuw bewaren overschrijft dezelfde route.
+- LoopCore: `PlannedRoute` en `RouteGeometry` (afstand met haversine, lengte, uitdunnen, afstand van een punt tot een lijn) in `PlannedRoute.swift`; `RunStore` bewaart routes in `planned-routes.json`; de backup bevat ze in het optionele veld `plannedRoutes` (oudere backups zonder dat veld laten de huidige routes staan, versie blijft 1). Tests in `PlannedRouteTests` (waarden nagerekend in Python).
+
 Stap 2 (lopen), plan goedgekeurd 15 okt:
 - Kadans komt mee (bewegingssensor, extra toestemming). Live stats op het vergrendelscherm later, samen met de widget (vraagt een extra extensie).
 - **Volgorde (beslist 15 okt):** eerst de `WorkoutEngine` in LoopCore (testbaar in Actions). Loopscherm, `RunTracker` (GPS, klok, stem, kadans), Na de loop en gemiste sessies/`finishWeek` pas na de PoC-test op de iPhone, zodat dat deel op een bewezen basis gebouwd wordt.
@@ -220,6 +226,8 @@ Bestanden app (`LoopApp/`):
 | `Shared/WorkoutViews.swift` | `WorkoutCard`, `WorkoutDetailView`, `StepRow` |
 | `Plan/PlanView.swift`, `Calendar/CalendarView.swift`, `Progress/VoortgangView.swift`, `Settings/SettingsView.swift` | De tabbladen, `ManualRunSheet`, `BackupDocument` |
 | `Debug/*` | Proof of concept |
+| `Map/RoutesMapView.swift` | Routekaart (gelopen routes) en routes plannen, `RoutePlanner`, `RunLine` |
+| `LiveActivity/RunActivity.swift` | Gedeeld met `RunnerWidgets`: Live Activity-gegevens en knoppen |
 | `Assets.xcassets/AppIcon.appiconset/` | App-icoon Runner (1024 px), bron in `Design/runner-icon.svg` |
 
 ## Opslag (`RunStore.swift`, `RunRecord.swift`, `Stats.swift`)

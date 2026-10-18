@@ -12,6 +12,7 @@ struct VoortgangView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     if let plan = model.plan { volumeCard(plan) }
+                    mapCard
                     recordsCard
                     runsCard
                 }
@@ -39,6 +40,38 @@ struct VoortgangView: View {
                 Text("\(run.title) van \(DateText.short(run.date)) wordt definitief verwijderd.")
             }
         }
+    }
+
+    // MARK: - Routekaart
+
+    private var mapCard: some View {
+        let gps = model.runs.filter { $0.source == .gps }.count
+        let saved = model.plannedRoutes.count
+        return NavigationLink {
+            RoutesMapView()
+        } label: {
+            Card(padding: 16) {
+                HStack(spacing: 14) {
+                    Image(systemName: "map")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 42, height: 42)
+                        .background(Theme.sunken, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Routekaart").font(.system(size: 16, weight: .heavy))
+                        Text("\(gps) gelopen \(gps == 1 ? "route" : "routes") · \(saved) bewaard · route plannen")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.secondary)
+                }
+                .foregroundStyle(Theme.text)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Weekvolume

@@ -6,6 +6,7 @@ import Foundation
 ///     runs/<id>.json        één bestand per loop, met route
 ///     runs-index.json       korte samenvatting per loop, voor lijsten en grafieken
 ///     meta.json             datum van de laatste backup
+///     planned-routes.json   zelf geplande routes
 public struct RunStore: Sendable {
     public let directory: URL
 
@@ -24,6 +25,7 @@ public struct RunStore: Sendable {
     var coachURL: URL { directory.appendingPathComponent("coach.json") }
     var indexURL: URL { directory.appendingPathComponent("runs-index.json") }
     var metaURL: URL { directory.appendingPathComponent("meta.json") }
+    var plannedRoutesURL: URL { directory.appendingPathComponent("planned-routes.json") }
     var runsDirectory: URL { directory.appendingPathComponent("runs", isDirectory: true) }
     func runURL(_ id: UUID) -> URL { runsDirectory.appendingPathComponent("\(id.uuidString).json") }
 
@@ -69,6 +71,24 @@ public struct RunStore: Sendable {
         try write(try summaries().filter { $0.id != id }, to: indexURL)
     }
 
+    // MARK: - Geplande routes
+
+    /// Alle geplande routes, nieuwste eerst.
+    public func plannedRoutes() throws -> [PlannedRoute] {
+        try read([PlannedRoute].self, from: plannedRoutesURL) ?? []
+    }
+
+    /// Bewaart een route. Dezelfde id opnieuw bewaren overschrijft.
+    public func save(_ route: PlannedRoute) throws {
+        var all = try plannedRoutes().filter { $0.id != route.id }
+        all.append(route)
+        try write(all.sorted { $0.created > $1.created }, to: plannedRoutesURL)
+    }
+
+    public func deletePlannedRoute(id: UUID) throws {
+        try write(try plannedRoutes().filter { $0.id != id }, to: plannedRoutesURL)
+    }
+
     // MARK: - Backup
 
     public func lastBackupDate() -> Date? {
@@ -77,7 +97,8 @@ public struct RunStore: Sendable {
 
     /// Alles in één bestand, om in de Bestanden-app te bewaren.
     public func makeBackup(now: Date = Date()) throws -> Data {
-        let backup = Backup(createdAt: now, coach: try loadCoach(), runs: try allRuns())
+        let backup = Backup(createdAt: now, coach: try loadCoach(), runs: try allRuns(),
+                            plannedRoutes: try plannedRoutes())
         let data = try Self.encoder.encode(backup)
         try write(StoreMeta(lastBackup: now), to: metaURL)
         return data
@@ -99,6 +120,10 @@ public struct RunStore: Sendable {
             try FileManager.default.removeItem(at: coachURL)
         }
         for run in backup.runs { try save(run) }
+        // Oudere backups hebben nog geen routes: dan blijven de huidige staan.
+        if let routes = backup.plannedRoutes {
+            try write(routes.sorted { $0.created > $1.created }, to: plannedRoutesURL)
+        }
         return backup
     }
 
@@ -149,12 +174,16 @@ public struct Backup: Codable, Equatable, Sendable {
     public var createdAt: Date
     public var coach: Coach?
     public var runs: [CompletedRun]
+    /// Sinds 18 okt 2026. Optioneel, zodat oudere backups nog gelezen kunnen worden.
+    public var plannedRoutes: [PlannedRoute]?
 
-    public init(version: Int = Backup.currentVersion, createdAt: Date, coach: Coach?, runs: [CompletedRun]) {
+    public init(version: Int = Backup.currentVersion, createdAt: Date, coach: Coach?, runs: [CompletedRun],
+                plannedRoutes: [PlannedRoute]? = nil) {
         self.version = version
         self.createdAt = createdAt
         self.coach = coach
         self.runs = runs
+        self.plannedRoutes = plannedRoutes
     }
 
     /// Bestandsnaam, bv. "LoopApp-backup-2026-10-15.json".

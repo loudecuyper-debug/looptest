@@ -37,6 +37,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var plan: TrainingPlan?
     @Published private(set) var runs: [RunSummary] = []
     @Published private(set) var records: [PersonalRecord] = []
+    @Published private(set) var plannedRoutes: [PlannedRoute] = []
     @Published var messages: [CoachMessage] = []
     @Published var errorText: String?
 
@@ -52,6 +53,7 @@ final class AppModel: ObservableObject {
         do {
             coach = try opened?.loadCoach()
             runs = try opened?.summaries() ?? []
+            plannedRoutes = try opened?.plannedRoutes() ?? []
         } catch {
             errorText = "Je gegevens konden niet gelezen worden: \(error.localizedDescription)"
         }
@@ -251,6 +253,38 @@ final class AppModel: ObservableObject {
         refreshRecords()
     }
 
+    // MARK: - Routes
+
+    /// Alle loopjes met een GPS-route, nieuwste eerst (leest de routes van schijf).
+    func gpsRuns() -> [CompletedRun] {
+        ((try? store?.allRuns()) ?? []).filter { $0.route.count > 1 }
+    }
+
+    func savePlannedRoute(_ route: PlannedRoute) {
+        guard let store else { return }
+        do {
+            try store.save(route)
+            plannedRoutes = try store.plannedRoutes()
+        } catch {
+            errorText = "De route kon niet bewaard worden: \(error.localizedDescription)"
+        }
+    }
+
+    func deletePlannedRoute(id: UUID) {
+        guard let store else { return }
+        do {
+            try store.deletePlannedRoute(id: id)
+            plannedRoutes = try store.plannedRoutes()
+        } catch {
+            errorText = "Verwijderen mislukt: \(error.localizedDescription)"
+        }
+    }
+
+    /// Rustig tempo (s/km) dat nu geldt, voor de geschatte duur van een route.
+    var easyPace: Double? {
+        currentVdot.map { PaceZones(vdot: $0).easy.target }
+    }
+
     private func refreshRecords() {
         let all = (try? store?.allRuns()) ?? []
         records = Stats.personalRecords(all)
@@ -276,6 +310,7 @@ final class AppModel: ObservableObject {
         try store.restore(from: data)
         coach = try store.loadCoach()
         runs = try store.summaries()
+        plannedRoutes = try store.plannedRoutes()
         messages = []
         refreshPlan()
         refreshRecords()
