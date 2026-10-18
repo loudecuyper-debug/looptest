@@ -46,7 +46,7 @@ struct SettingsView: View {
                     cuesCard
                     backupCard
                     diagnoseCard
-                    Text("LoopApp \(appVersion) · alles lokaal, geen account")
+                    Text("Runner \(appVersion) · alles lokaal, geen account")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.tertiary)
                         .padding(.top, 4)

@@ -219,12 +219,12 @@ final class RunSession: NSObject, ObservableObject, CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         switch manager.authorizationStatus {
         case .denied, .restricted:
-            authProblem = "Locatietoegang staat uit. Zet hem aan via Instellingen › LoopApp › Locatie."
+            authProblem = "Locatietoegang staat uit. Zet hem aan via Instellingen › Runner › Locatie."
         default:
             authProblem = nil
         }
         if manager.accuracyAuthorization == .reducedAccuracy {
-            authProblem = "Zet 'Exacte locatie' aan via Instellingen › LoopApp › Locatie."
+            authProblem = "Zet 'Exacte locatie' aan via Instellingen › Runner › Locatie."
         }
     }
 

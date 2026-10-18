@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>nl</string>
 	<key>CFBundleDisplayName</key>
-	<string>LoopApp</string>
+	<string>Runner</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,9 +25,9 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>LoopApp gebruikt je locatie om je afstand, tempo en route tijdens het lopen te meten.</string>
+	<string>Runner gebruikt je locatie om je afstand, tempo en route tijdens het lopen te meten.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>LoopApp gebruikt je locatie om je loop te blijven meten terwijl je scherm vergrendeld is.</string>
+	<string>Runner gebruikt je locatie om je loop te blijven meten terwijl je scherm vergrendeld is.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
