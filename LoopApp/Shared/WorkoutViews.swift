@@ -8,29 +8,38 @@ struct WorkoutCard: View {
     let date: Date
     let status: WorkoutStatus
     let run: RunSummary?
+    /// Optioneel extra label naast het type, bv. "Vandaag" of "Eerste training".
+    var label: String? = nil
 
     var body: some View {
         let zones = week.zones
-        Card {
-            VStack(alignment: .leading, spacing: 14) {
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        TypeTag(type: workout.type, extra: workout.isExtra)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            TypeTag(type: workout.type, extra: workout.isExtra)
+                            if let label {
+                                Text("· \(label.uppercased())")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Theme.secondary)
+                            }
+                        }
                         Text(workout.title)
-                            .font(.system(size: 28, weight: .heavy))
+                            .font(.system(size: 21, weight: .heavy))
                             .foregroundStyle(Theme.text)
                         Text("\(TimeText.distance(workout.estimatedDistance(zones: zones))) · \(Fmt.minutes(workout.estimatedDuration(zones: zones))) · \(DateText.short(date))")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.secondary)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.secondary)
                         .padding(.top, 4)
                 }
                 Text(WorkoutText.describe(workout, zones: zones))
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.text)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -47,12 +56,12 @@ struct WorkoutCard: View {
         case .done:
             if let run {
                 Label("Gelopen: \(Fmt.km2(run.distance)) in \(TimeText.clock(run.duration))", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Theme.good)
             }
         case .missed:
             Label("Niet gelopen", systemImage: "minus.circle")
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.tertiary)
         case .today, .upcoming:
             EmptyView()
@@ -103,9 +112,9 @@ struct WorkoutDetailView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     TypeTag(type: workout.type, extra: workout.isExtra)
                     Text(workout.title)
-                        .font(.system(size: 30, weight: .heavy))
+                        .font(.system(size: 24, weight: .heavy))
                     Text("\(DateText.long(date)) · week \(week.number)")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.secondary)
                 }
 
@@ -113,7 +122,7 @@ struct WorkoutDetailView: View {
                     HStack {
                         StatBlock(label: "Afstand", value: TimeText.distance(workout.estimatedDistance(zones: zones)))
                         StatBlock(label: "Duur", value: Fmt.minutes(workout.estimatedDuration(zones: zones)))
-                        StatBlock(label: "Status", value: statusText(status), size: 17)
+                        StatBlock(label: "Status", value: statusText(status), size: 15)
                     }
                 }
 
@@ -123,7 +132,7 @@ struct WorkoutDetailView: View {
                         ForEach(Array(workout.blocks.enumerated()), id: \.offset) { _, block in
                             if block.repeats > 1 {
                                 Text("\(block.repeats)× herhalen")
-                                    .font(.system(size: 13, weight: .heavy))
+                                    .font(.system(size: 12, weight: .heavy))
                                     .foregroundStyle(workout.type.color)
                                     .padding(.top, 10)
                                     .padding(.bottom, 2)
@@ -151,7 +160,7 @@ struct WorkoutDetailView: View {
                             }
                         } label: {
                             Label("Verplaatsen naar andere dag", systemImage: "arrow.left.arrow.right")
-                                .font(.system(size: 15, weight: .bold))
+                                .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(Theme.text)
                                 .frame(maxWidth: .infinity, minHeight: 46)
                                 .background(Theme.sunken, in: Capsule())
@@ -213,14 +222,14 @@ struct StepRow: View {
                 .fill(dotColor)
                 .frame(width: 4, height: 30)
             VStack(alignment: .leading, spacing: 2) {
-                Text(kindName).font(.system(size: 16, weight: .bold))
+                Text(kindName).font(.system(size: 15, weight: .bold))
                 Text(lengthText)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.secondary)
             }
             Spacer()
             Text(paceText)
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: 14, weight: .heavy))
                 .monospacedDigit()
         }
         .padding(.vertical, 8)

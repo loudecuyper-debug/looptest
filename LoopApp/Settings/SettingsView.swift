@@ -47,7 +47,7 @@ struct SettingsView: View {
                     backupCard
                     diagnoseCard
                     Text("Runner \(appVersion) · alles lokaal, geen account")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Theme.tertiary)
                         .padding(.top, 4)
                 }
@@ -99,23 +99,21 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 SectionLabel("Stem", color: Theme.muted).padding(.bottom, 10)
                 HStack {
-                    Text("Stem").font(.system(size: 16, weight: .bold))
+                    Text("Stem").font(.system(size: 15, weight: .bold))
                     Spacer()
                     Text(Speaker.describe(Speaker.bestVoice()))
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.secondary)
                         .multilineTextAlignment(.trailing)
                 }
                 .frame(minHeight: 48)
                 .overlay(alignment: .top) { divider }
 
-                HStack {
-                    Text("Spreektempo").font(.system(size: 16, weight: .bold))
-                    Spacer()
-                    Segmented(options: [(0, "Trager"), (1, "Normaal"), (2, "Sneller")], selection: $voiceRate, height: 34)
-                        .frame(width: 236)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Spreektempo").font(.system(size: 15, weight: .bold))
+                    Segmented(options: [(0, "Trager"), (1, "Normaal"), (2, "Sneller")], selection: $voiceRate, height: 32)
                 }
-                .frame(minHeight: 56)
+                .padding(.vertical, 12)
                 .overlay(alignment: .top) { divider }
 
                 Button {
@@ -130,7 +128,7 @@ struct SettingsView: View {
                 .padding(.top, 8)
 
                 Text("Een betere stem download je in iOS via Instellingen › Toegankelijkheid › Gesproken materiaal › Stemmen › Nederlands. De app kiest automatisch de beste.")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
@@ -157,10 +155,10 @@ struct SettingsView: View {
     private func toggleRow(_ title: String, _ subtitle: String?, _ isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.system(size: 16, weight: .bold))
+                Text(title).font(.system(size: 15, weight: .bold))
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Theme.secondary)
                 }
             }
@@ -183,10 +181,10 @@ struct SettingsView: View {
                     Circle().fill(late ? Theme.accent : (last == nil ? Theme.outline : Theme.good))
                         .frame(width: 10, height: 10)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(backupTitle(last)).font(.system(size: 16, weight: .heavy))
+                        Text(backupTitle(last)).font(.system(size: 15, weight: .heavy))
                         if let last {
                             Text(Backup.fileName(for: last))
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(Theme.secondary)
                         }
                     }
@@ -197,7 +195,7 @@ struct SettingsView: View {
                 .background(Theme.sunken, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
                 Text("Alles staat enkel op deze iPhone. Bewaar af en toe een backup in Bestanden, bijvoorbeeld in iCloud Drive.")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -256,13 +254,13 @@ struct SettingsView: View {
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("GPS en stem testen").font(.system(size: 16, weight: .bold))
+                            Text("GPS en stem testen").font(.system(size: 15, weight: .bold))
                             Text("Intervaltest of vrij lopen met diagnose")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(Theme.secondary)
                         }
                         Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 14, weight: .bold))
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
                     }
                     .foregroundStyle(Theme.text)
                     .frame(minHeight: 48)

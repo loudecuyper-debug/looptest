@@ -108,6 +108,7 @@ enum DateText {
     private static let yearF = formatter("EEE d MMM yyyy")
     private static let dayF = formatter("d")
     private static let timeF = formatter("HH:mm")
+    private static let monthF = formatter("LLLL yyyy")
 
     /// "ma 19 okt"
     static func short(_ d: Date) -> String { clean(shortF.string(from: d)) }
@@ -124,6 +125,8 @@ enum DateText {
     static func dayNumber(_ d: Date) -> String { dayF.string(from: d) }
     /// "18:42"
     static func time(_ d: Date) -> String { timeF.string(from: d) }
+    /// "oktober 2026"
+    static func monthYear(_ d: Date) -> String { monthF.string(from: d) }
 
     private static func clean(_ s: String) -> String { s.replacingOccurrences(of: ".", with: "") }
 }
@@ -157,7 +160,7 @@ struct SectionLabel: View {
 
     var body: some View {
         Text(text.uppercased())
-            .font(.system(size: 12, weight: .heavy))
+            .font(.system(size: 11, weight: .heavy))
             .tracking(1.2)
             .foregroundStyle(color)
     }
@@ -172,7 +175,7 @@ struct TypeTag: View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 3).fill(type.color).frame(width: 10, height: 10)
             Text(extra ? "EXTRA · \(type.label)" : type.label)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(type.color)
         }
         .accessibilityElement(children: .combine)
@@ -183,7 +186,7 @@ struct TypeTag: View {
 struct StatBlock: View {
     let label: String
     let value: String
-    var size: CGFloat = 22
+    var size: CGFloat = 19
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -218,7 +221,7 @@ private struct PrimaryButtonBody: View {
 
     var body: some View {
         configuration.label
-            .font(.system(size: height >= 52 ? 19 : 16, weight: .heavy))
+            .font(.system(size: height >= 52 ? 17 : 15, weight: .heavy))
             .foregroundStyle(Theme.background)
             .frame(maxWidth: .infinity, minHeight: height)
             .background(Theme.text.opacity(configuration.isPressed ? 0.8 : 1), in: Capsule())
@@ -241,7 +244,7 @@ private struct SecondaryButtonBody: View {
 
     var body: some View {
         configuration.label
-            .font(.system(size: 15, weight: .bold))
+            .font(.system(size: 14, weight: .bold))
             .foregroundStyle(Theme.text)
             .frame(maxWidth: .infinity, minHeight: height)
             .background(Theme.sunken.opacity(configuration.isPressed ? 0.6 : 1), in: Capsule())
@@ -260,7 +263,7 @@ struct Chip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: 14, weight: .heavy))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .foregroundStyle(selected ? Theme.background : Theme.text)
@@ -304,13 +307,13 @@ struct ChoiceCard: View {
         Button(action: action) {
             HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .font(.system(size: 19, weight: .medium))
+                    .font(.system(size: 17, weight: .medium))
                     .frame(width: 44, height: 44)
                     .background(Theme.sunken, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title).font(.system(size: 18, weight: .heavy))
+                    Text(title).font(.system(size: 16, weight: .heavy))
                     Text(subtitle)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.secondary)
                 }
                 Spacer(minLength: 0)
@@ -343,7 +346,7 @@ struct Segmented<Value: Hashable>: View {
                     selection = option.value
                 } label: {
                     Text(option.title)
-                        .font(.system(size: 15, weight: on ? .heavy : .bold))
+                        .font(.system(size: 14, weight: on ? .heavy : .bold))
                         .foregroundStyle(on ? Theme.background : Theme.text)
                         .frame(maxWidth: .infinity, minHeight: height)
                         .background(on ? Theme.text : Color.clear, in: Capsule())
@@ -398,11 +401,11 @@ struct BigStepper: View {
             Spacer()
             VStack(spacing: 2) {
                 Text("\(value)")
-                    .font(.system(size: 84, weight: .black))
+                    .font(.system(size: 64, weight: .black))
                     .monospacedDigit()
                     .contentTransition(.numericText())
                 Text(unit)
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(Theme.secondary)
             }
             Spacer()
@@ -428,7 +431,7 @@ struct BigStepper: View {
     private func roundButton(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(Theme.text)
                 .frame(width: 56, height: 56)
                 .background(Theme.sunken, in: Circle())
@@ -480,7 +483,7 @@ extension View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text(title).font(.system(size: 18, weight: .heavy)).foregroundStyle(Theme.text)
+                    Text(title).font(.system(size: 16, weight: .heavy)).foregroundStyle(Theme.text)
                 }
             }
             .toolbarBackground(Theme.background, for: .navigationBar)

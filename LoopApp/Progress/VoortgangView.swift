@@ -25,7 +25,7 @@ struct VoortgangView: View {
                     Button {
                         showAdd = true
                     } label: {
-                        Image(systemName: "plus").font(.system(size: 17, weight: .bold))
+                        Image(systemName: "plus").font(.system(size: 15, weight: .bold))
                     }
                     .accessibilityLabel("Loop toevoegen")
                 }
@@ -89,7 +89,7 @@ struct VoortgangView: View {
     private func legend(_ color: Color, _ text: String) -> some View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 10, height: 10)
-            Text(text).font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.secondary)
+            Text(text).font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.secondary)
         }
     }
 
@@ -101,21 +101,21 @@ struct VoortgangView: View {
                 SectionLabel("Persoonlijke records", color: Theme.muted).padding(.bottom, 8)
                 if model.records.isEmpty {
                     Text("Records verschijnen zodra je loopjes met GPS gelopen hebt.")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.secondary)
                         .padding(.vertical, 6)
                 } else {
                     ForEach(model.records, id: \.label) { r in
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(r.label).font(.system(size: 16, weight: .semibold))
+                                Text(r.label).font(.system(size: 15, weight: .semibold))
                                 Text(DateText.withYear(r.date))
-                                    .font(.system(size: 13, weight: .medium))
+                                    .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(Theme.secondary)
                             }
                             Spacer()
                             Text(r.label == "Langste loop" ? Fmt.km2(r.distance) : TimeText.clock(r.time))
-                                .font(.system(size: 18, weight: .heavy))
+                                .font(.system(size: 16, weight: .heavy))
                                 .monospacedDigit()
                         }
                         .padding(.vertical, 10)
@@ -135,7 +135,7 @@ struct VoortgangView: View {
                 SectionLabel("Alle loopjes", color: Theme.muted).padding(.bottom, 8)
                 if model.runs.isEmpty {
                     Text("Nog geen loopjes. Voeg een loop toe met + rechtsboven.")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.secondary)
                         .padding(.vertical, 6)
                 } else {
@@ -155,16 +155,16 @@ struct VoortgangView: View {
                 .fill(run.type?.color ?? Theme.outline)
                 .frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
-                Text(run.title).font(.system(size: 16, weight: .bold))
+                Text(run.title).font(.system(size: 15, weight: .bold))
                 Text("\(DateText.short(run.date))\(run.source == .manual ? " · manueel" : "")")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.secondary)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                Text(Fmt.km2(run.distance)).font(.system(size: 16, weight: .heavy)).monospacedDigit()
+                Text(Fmt.km2(run.distance)).font(.system(size: 15, weight: .heavy)).monospacedDigit()
                 Text("\(TimeText.clock(run.duration))\(pace.map { " · " + TimeText.pace($0) } ?? "")")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.secondary)
                     .monospacedDigit()
             }
@@ -232,7 +232,7 @@ struct ManualRunSheet: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Telt als geplande workout")
                                 Text(planned.workout.title)
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(Theme.secondary)
                             }
                         }

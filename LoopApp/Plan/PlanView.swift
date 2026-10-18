@@ -56,17 +56,17 @@ struct PlanView: View {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(PlanTexts.goalTitle(plan.input))
-                        .font(.system(size: 28, weight: .heavy))
+                        .font(.system(size: 21, weight: .heavy))
                     if let raceDate {
                         Text("Tijdrit: \(DateText.withYear(raceDate))")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.secondary)
                     }
                 }
                 PhaseStrip(weeks: plan.weeks, current: currentWeekNumber)
                 HStack(alignment: .top) {
-                    StatBlock(label: "Weken", value: "\(currentWeekNumber ?? 0)/\(plan.weeks.count)", size: 30)
-                    StatBlock(label: "Totale afstand", value: "\(Fmt.decimal(total / 1000)) km", size: 30)
+                    StatBlock(label: "Weken", value: "\(currentWeekNumber ?? 0)/\(plan.weeks.count)", size: 24)
+                    StatBlock(label: "Totale afstand", value: "\(Fmt.decimal(total / 1000)) km", size: 24)
                 }
                 Button("Plan beheren") { showManage = true }
                     .buttonStyle(PrimaryButtonStyle(height: 52))
@@ -85,7 +85,7 @@ struct PlanView: View {
                     SectionLabel("Tempozones", color: Theme.muted)
                     Spacer()
                     Text("Niveau \(Fmt.decimal(vdot))")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Theme.secondary)
                 }
                 .padding(.bottom, 8)
@@ -93,15 +93,15 @@ struct PlanView: View {
                     HStack(alignment: .top, spacing: 10) {
                         RoundedRectangle(cornerRadius: 3).fill(z.color).frame(width: 10, height: 10).padding(.top, 6)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(z.name).font(.system(size: 16, weight: .semibold))
+                            Text(z.name).font(.system(size: 15, weight: .semibold))
                             Text(z.explanation)
-                                .font(.system(size: 13, weight: .medium))
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(Theme.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer()
                         Text(TimeText.range(zones.range(for: z)))
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: 15, weight: .bold))
                             .monospacedDigit()
                     }
                     .padding(.vertical, 10)
@@ -122,10 +122,10 @@ struct PlanView: View {
                 ForEach(distances.indices, id: \.self) { i in
                     let item = distances[i]
                     HStack {
-                        Text(item.0).font(.system(size: 16, weight: .semibold))
+                        Text(item.0).font(.system(size: 15, weight: .semibold))
                         Spacer()
                         Text(TimeText.clock(zones.predictedTime(distance: item.1)))
-                            .font(.system(size: 18, weight: .heavy))
+                            .font(.system(size: 16, weight: .heavy))
                             .monospacedDigit()
                     }
                     .padding(.vertical, 10)
@@ -143,16 +143,16 @@ struct PlanView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     SectionLabel("Niveau-aanpassingen", color: Theme.muted).padding(.bottom, 8)
                     HStack {
-                        Text("Start").font(.system(size: 16, weight: .semibold))
+                        Text("Start").font(.system(size: 15, weight: .semibold))
                         Spacer()
-                        Text(Fmt.decimal(plan.zones.vdot)).font(.system(size: 16, weight: .bold)).monospacedDigit()
+                        Text(Fmt.decimal(plan.zones.vdot)).font(.system(size: 15, weight: .bold)).monospacedDigit()
                     }
                     .padding(.vertical, 10)
                     ForEach(Array(changes.enumerated()), id: \.offset) { _, change in
                         HStack {
-                            Text("Vanaf week \(change.fromWeek + 1)").font(.system(size: 16, weight: .semibold))
+                            Text("Vanaf week \(change.fromWeek + 1)").font(.system(size: 15, weight: .semibold))
                             Spacer()
-                            Text(Fmt.decimal(change.vdot)).font(.system(size: 16, weight: .bold)).monospacedDigit()
+                            Text(Fmt.decimal(change.vdot)).font(.system(size: 15, weight: .bold)).monospacedDigit()
                         }
                         .padding(.vertical, 10)
                         .overlay(alignment: .top) { Rectangle().fill(Theme.cardBorder).frame(height: 1) }

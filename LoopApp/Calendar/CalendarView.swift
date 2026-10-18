@@ -1,28 +1,32 @@
 import SwiftUI
 import LoopCore
 
+enum CalendarMode: String {
+    case list, month
+}
+
 struct CalendarView: View {
     @EnvironmentObject var model: AppModel
     @State private var notice: String?
+    @AppStorage("calendarMode") private var modeRaw = CalendarMode.list.rawValue
+
+    private var mode: Binding<CalendarMode> {
+        Binding(get: { CalendarMode(rawValue: modeRaw) ?? .list }, set: { modeRaw = $0.rawValue })
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    if let plan = model.plan {
-                        LazyVStack(spacing: 14) {
-                            ForEach(plan.weeks, id: \.number) { week in
-                                weekSection(week, isCurrent: currentWeek == week.number - 1)
-                                    .id(week.number)
-                            }
-                        }
-                        .foregroundStyle(Theme.text)
-                        .padding(.horizontal, Theme.margin)
-                        .padding(.vertical, 8)
-                    }
-                }
-                .onAppear {
-                    if let w = currentWeek { proxy.scrollTo(w + 1, anchor: .top) }
+            VStack(spacing: 0) {
+                Segmented(options: [(CalendarMode.list, "Lijst"), (CalendarMode.month, "Maand")],
+                          selection: mode, height: 32)
+                    .padding(.horizontal, Theme.margin)
+                    .padding(.top, 6)
+                    .padding(.bottom, 8)
+
+                if mode.wrappedValue == .month {
+                    MonthCalendar(onMove: move)
+                } else {
+                    listView
                 }
             }
             .screenTitle("Kalender")
@@ -31,6 +35,27 @@ struct CalendarView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(notice ?? "")
+            }
+        }
+    }
+
+    private var listView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                if let plan = model.plan {
+                    LazyVStack(spacing: 14) {
+                        ForEach(plan.weeks, id: \.number) { week in
+                            weekSection(week, isCurrent: currentWeek == week.number - 1)
+                                .id(week.number)
+                        }
+                    }
+                    .foregroundStyle(Theme.text)
+                    .padding(.horizontal, Theme.margin)
+                    .padding(.vertical, 8)
+                }
+            }
+            .onAppear {
+                if let w = currentWeek { proxy.scrollTo(w + 1, anchor: .top) }
             }
         }
     }
@@ -48,13 +73,13 @@ struct CalendarView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("Week \(week.number)")
-                        .font(.system(size: 18, weight: .heavy))
+                        .font(.system(size: 16, weight: .heavy))
                     Text(week.isRecoveryWeek ? "Rustweek" : week.phase.name)
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Theme.secondary)
                     if isCurrent {
                         Text("Nu")
-                            .font(.system(size: 12, weight: .heavy))
+                            .font(.system(size: 11, weight: .heavy))
                             .foregroundStyle(Theme.background)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
@@ -62,12 +87,12 @@ struct CalendarView: View {
                     }
                     Spacer()
                     Text("\(Fmt.decimal(km)) km")
-                        .font(.system(size: 15, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .monospacedDigit()
                 }
                 .padding(.bottom, 2)
                 Text("\(DateText.short(week.startDate)) tot \(DateText.short(week.date(for: .sunday)))")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.secondary)
                     .padding(.bottom, 8)
 
@@ -90,18 +115,18 @@ struct CalendarView: View {
             HStack(spacing: 12) {
                 VStack(spacing: 0) {
                     Text(day.day.short.uppercased())
-                        .font(.system(size: 12, weight: .heavy))
+                        .font(.system(size: 11, weight: .heavy))
                         .foregroundStyle(Theme.secondary)
                     Text(DateText.dayNumber(date))
-                        .font(.system(size: 17, weight: .heavy))
+                        .font(.system(size: 15, weight: .heavy))
                 }
                 .frame(width: 34)
                 RoundedRectangle(cornerRadius: 3).fill(workout.type.color).frame(width: 10, height: 10)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(workout.isExtra ? "\(workout.title) (extra)" : workout.title)
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 15, weight: .bold))
                     Text(TimeText.distance(workout.estimatedDistance(zones: week.zones)))
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Theme.secondary)
                 }
                 Spacer()
@@ -129,23 +154,23 @@ struct CalendarView: View {
         switch status {
         case .done:
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 20))
+                .font(.system(size: 17))
                 .foregroundStyle(Theme.good)
                 .accessibilityLabel("Gelopen")
         case .missed:
             Text("Gemist")
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Theme.tertiary)
         case .today:
             Text("Vandaag")
-                .font(.system(size: 12, weight: .heavy))
+                .font(.system(size: 11, weight: .heavy))
                 .foregroundStyle(Theme.background)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(Theme.text, in: Capsule())
         case .upcoming:
             Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Theme.tertiary)
         }
     }

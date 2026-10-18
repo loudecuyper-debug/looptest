@@ -179,6 +179,14 @@ Stap 1 (klaar 15 okt, app-build en LoopCore-tests groen in Actions, draait op de
 - Afwijkingen van de tekeningen: testloop in de onboarding vraagt de afstand na 12 minuten (de app kan nog niet lopen); Apple Health en meldingen nog niet in Instellingen.
 - Nog niet: gemiste sessies automatisch melden aan de coach en `finishWeek` bij een nieuwe week (komt met stap 2, anders telt alles als gemist zolang lopen niet kan); coach-meldingen worden nog niet bewaard tussen app-starts.
 
+UI-ronde 18 okt (na eerste test op de iPhone, tekening goedgekeurd door Louis):
+- **Vandaag** heeft altijd dezelfde opbouw, ook voor de start: weekstrook (voor de start week 1, zonder "vandaag"), melding "Je plan start morgen / over x dagen", workoutkaart met klein label (VANDAAG, MORGEN, EERSTE TRAINING), weekoverzicht ("Trainingen" en "Afstand"), Extra loop en Niet 100% enkel tijdens het plan, vaste witte knop onderaan: "Start <workout>" op een trainingsdag, anders "Vrij lopen" (beide tonen nog de uitleg dat lopen in stap 2 komt). Het aparte scherm "Je plan start…" is weg.
+- **Kalender**: schakelaar Lijst / Maand bovenaan (keuze onthouden). Maand = rooster met tegels per dag zoals een echte kalender: vandaag omrand, trainingsdagen lichter met een streepje in de typekleur (vinkje als gelopen, vaag als gemist), gekozen dag wit. Eronder de workoutkaart van de gekozen dag (standaard de eerstvolgende), legende van de types, geplande km van de maand rechtsboven, ‹ › binnen de maanden van het plan, lang drukken om te verplaatsen. Bestand `Calendar/MonthCalendar.swift` (met `FlowRow`-layout).
+- **Letters een trap kleiner** in alle schermen (niet in Debug), vaste tabel: 84→64, 44→34, 36→30, 32/30→24, 28→21, 26/24→20, 22→19, 20/19→17, 18→16, 17→15, 16→15, 15→14, 14→13, 13→12, 12→11. Grote cijfers op Plan 30→24, primaire knop 19→17.
+- Instellingen: "Spreektempo" staat boven de keuze (brak midden in het woord). Stemnaam zonder dubbel "verbeterd".
+- Stem: Louis verkiest **Xander (Enhanced, nl-NL)** boven Ellen; de app kiest hem automatisch zolang Ellen Enhanced niet geïnstalleerd is.
+- Controle: Swift-syntax met tree-sitter in Claude's werkruimte (geen Swift-compiler), echte build in Actions.
+
 Stap 2 (lopen), plan goedgekeurd 15 okt:
 - Kadans komt mee (bewegingssensor, extra toestemming). Live stats op het vergrendelscherm later, samen met de widget (vraagt een extra extensie).
 - **Volgorde (beslist 15 okt):** eerst de `WorkoutEngine` in LoopCore (testbaar in Actions). Loopscherm, `RunTracker` (GPS, klok, stem, kadans), Na de loop en gemiste sessies/`finishWeek` pas na de PoC-test op de iPhone, zodat dat deel op een bewezen basis gebouwd wordt.
@@ -216,7 +224,8 @@ Bestanden app (`LoopApp/`):
 - ✅ Alle schermen getekend in stijl D en goedgekeurd (15 okt).
 - ✅ SwiftUI stap 1 (15 okt): app-build en LoopCore-tests groen, draait op de iPhone.
 - ✅ `WorkoutEngine` + tests + cue-preview (15 okt): LoopCore-tests en app-build groen in Actions.
-- Nog niet getest: GPS met scherm uit en kwaliteit van de cues (Instellingen › Diagnose), schermen van stap 1 op het toestel.
+- 🔄 Eerste Diagnose-test (18 okt, binnenshuis gewandeld): GPS liep door met scherm uit (107 punten in 173 s achtergrond). "Haperde" kwam door zwak binnensignaal (punten >30 m onnauwkeurig weggefilterd, gat 17 s) en de afstand (0,27 km) en tempo's zijn binnen onbruikbaar. Stem en cues klonken. Echte test buiten (10+ min, scherm vergrendeld) nog te doen. Fout `kCLErrorDomain 1` bij de start = toestemmingsvraag stond nog open, eenmalig.
+- 🔄 UI-ronde 18 okt (Vandaag, maandkalender, kleinere letters): klaar in de repo-bestanden, nog te pushen en te bekijken op de iPhone.
 
 **Installeren en verversen (werkwijze sinds 18 okt):**
 1. iloader (2.3.10 of nieuwer) op de pc, iPhone met kabel, ontgrendeld.

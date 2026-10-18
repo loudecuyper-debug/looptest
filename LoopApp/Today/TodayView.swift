@@ -16,9 +16,9 @@ struct TodayView: View {
                 if let plan = model.plan, let moment = model.moment() {
                     switch moment {
                     case .running(let today):
-                        running(plan: plan, today: today)
+                        dayScreen(plan: plan, today: today, startDate: nil)
                     case .notStarted(let start):
-                        notStarted(plan: plan, start: start)
+                        dayScreen(plan: plan, today: nil, startDate: start)
                     case .finished:
                         finished
                     }
@@ -38,24 +38,30 @@ struct TodayView: View {
         }
     }
 
-    // MARK: - Plan loopt
+    // MARK: - Plan loopt of start binnenkort
 
-    private func running(plan: TrainingPlan, today: PlanDay) -> some View {
-        let day = (selected?.week == today.week) ? (selected ?? today) : today
+    /// `today` is nil zolang het plan nog niet begonnen is; dan toont Vandaag week 1.
+    private func dayScreen(plan: TrainingPlan, today: PlanDay?, startDate: Date?) -> some View {
+        let first = plan.weeks[0].workouts.first.map { PlanDay(week: 0, day: $0.day) } ?? PlanDay(week: 0, day: .monday)
+        let anchor = today ?? first
+        let day = (selected?.week == anchor.week) ? (selected ?? anchor) : anchor
         let week = plan.weeks[day.week]
         let workout = week.workout(on: day.day)
         let status = model.status(of: day)
+        let startable = today != nil && workout != nil && day == today && status == .today && !model.isSick
 
         return ScrollView {
             VStack(spacing: 0) {
                 WeekHeader(plan: plan, week: week, today: today, selected: day) { selected = $0 }
-                VStack(spacing: 14) {
+                VStack(spacing: 12) {
+                    if let startDate { startBanner(startDate, plan: plan) }
                     if model.isSick { sickCard }
                     ForEach(model.messages) { CoachMessageCard(message: $0) }
 
                     if let workout, let date = model.date(for: day) {
                         NavigationLink(value: day) {
-                            WorkoutCard(workout: workout, week: week, date: date, status: status, run: model.run(for: day))
+                            WorkoutCard(workout: workout, week: week, date: date, status: status,
+                                        run: model.run(for: day), label: cardLabel(day: day, today: today, first: first))
                         }
                         .buttonStyle(.plain)
                     } else {
@@ -64,38 +70,76 @@ struct TodayView: View {
 
                     weekCard(week)
 
-                    HStack(spacing: 10) {
-                        Button("+ Extra loop") { showExtra = true }
-                            .buttonStyle(SecondaryButtonStyle())
-                        Button("Niet 100%") { showNotFeeling = true }
-                            .buttonStyle(SecondaryButtonStyle())
+                    if today != nil {
+                        HStack(spacing: 10) {
+                            Button("+ Extra loop") { showExtra = true }
+                                .buttonStyle(SecondaryButtonStyle(height: 44))
+                            Button("Niet 100%") { showNotFeeling = true }
+                                .buttonStyle(SecondaryButtonStyle(height: 44))
+                        }
+                        .disabled(model.isSick)
                     }
-                    .disabled(model.isSick)
 
                     if model.backupReminder { backupCard }
                 }
                 .padding(.horizontal, Theme.margin)
-                .padding(.top, 18)
+                .padding(.top, 14)
                 .padding(.bottom, 24)
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if workout != nil, day == today, status == .today, !model.isSick {
+            if !model.isSick {
                 Button {
                     showStartInfo = true
                 } label: {
-                    Label("Start workout", systemImage: "play.fill")
+                    Label(startable ? "Start \(workout?.title.lowercased() ?? "workout")" : "Vrij lopen",
+                          systemImage: "play.fill")
                 }
-                .buttonStyle(PrimaryButtonStyle())
+                .buttonStyle(PrimaryButtonStyle(height: 52))
                 .padding(.horizontal, Theme.margin)
                 .padding(.bottom, 10)
             }
         }
         .sheet(isPresented: $showExtra) {
-            ExtraRunSheet(week: plan.weeks[today.week], today: today)
+            if let today { ExtraRunSheet(week: plan.weeks[today.week], today: today) }
         }
         .sheet(isPresented: $showNotFeeling) {
             NotFeelingSheet()
+        }
+    }
+
+    /// Klein label boven de workoutkaart: wanneer het is, of dat het de eerste training is.
+    private func cardLabel(day: PlanDay, today: PlanDay?, first: PlanDay) -> String? {
+        if let today {
+            if day == today { return "Vandaag" }
+            if day.index == today.index + 1 { return "Morgen" }
+            return nil
+        }
+        return day == first ? "Eerste training" : nil
+    }
+
+    private func startBanner(_ start: Date, plan: TrainingPlan) -> some View {
+        let days = model.calendar.dateComponents([.day], from: model.calendar.startOfDay(for: Date()), to: start).day ?? 0
+        let when: String
+        switch days {
+        case ...1: when = "morgen"
+        case 2...6: when = "over \(days) dagen"
+        default: when = DateText.long(start)
+        }
+        return Card(padding: 16) {
+            HStack(spacing: 12) {
+                Circle().fill(Theme.accent).frame(width: 9, height: 9)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Je plan start \(when)")
+                        .font(.system(size: 15, weight: .heavy))
+                    Text("\(DateText.longCapitalized(start)) · \(PlanTexts.goalTitle(plan.input)) · \(plan.weeks.count) weken")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(Theme.text)
         }
     }
 
@@ -104,9 +148,9 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionLabel("Niet 100%")
                 Text("Je trainingen staan op pauze")
-                    .font(.system(size: 22, weight: .heavy))
+                    .font(.system(size: 19, weight: .heavy))
                 Text("Geef aan wanneer je hersteld bent. Daarna volgen eerst 3 rustige dagen.")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Ik ben hersteld") { model.recovered() }
@@ -120,11 +164,11 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 8) {
                 SectionLabel("Rustdag")
                 Text("Geen training gepland")
-                    .font(.system(size: 26, weight: .heavy))
+                    .font(.system(size: 20, weight: .heavy))
                 if let next = model.nextWorkout(after: day), let date = model.date(for: next.day),
                    let week = model.week(next.day) {
                     Text("Volgende: \(DateText.short(date)) · \(next.workout.title) · \(TimeText.distance(next.workout.estimatedDistance(zones: week.zones)))")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.secondary)
                 }
             }
@@ -143,28 +187,28 @@ struct TodayView: View {
             Card(padding: 16) {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
-                        Text("Week \(week.number) overzicht").font(.system(size: 18, weight: .bold))
+                        Text("Week \(week.number) overzicht").font(.system(size: 16, weight: .bold))
                         if week.isRecoveryWeek {
                             Text("Rustweek")
-                                .font(.system(size: 12, weight: .heavy))
+                                .font(.system(size: 11, weight: .heavy))
                                 .foregroundStyle(Theme.secondary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(Theme.sunken, in: Capsule())
                         }
                         Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 14, weight: .bold))
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
                     }
                     HStack(spacing: 8) {
                         Bar(fraction: runFraction)
                         Bar(fraction: progress.fraction)
                     }
                     HStack {
-                        Text("Loopjes: ").foregroundColor(Theme.secondary) + Text("\(done)/\(planned.count)")
+                        Text("Trainingen: ").foregroundColor(Theme.secondary) + Text("\(done)/\(planned.count)")
                         Spacer()
                         Text("Afstand: ").foregroundColor(Theme.secondary) + Text(progress.text)
                     }
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                 }
                 .foregroundStyle(Theme.text)
             }
@@ -180,13 +224,13 @@ struct TodayView: View {
                 HStack(spacing: 12) {
                     Circle().fill(Theme.accent).frame(width: 10, height: 10)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Tijd voor een backup").font(.system(size: 16, weight: .heavy))
+                        Text("Tijd voor een backup").font(.system(size: 15, weight: .heavy))
                         Text("Je laatste backup is meer dan 3 weken oud.")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Theme.secondary)
                     }
                     Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 14, weight: .bold))
+                    Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
                 }
                 .foregroundStyle(Theme.text)
             }
@@ -194,42 +238,15 @@ struct TodayView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Voor de start en na het plan
-
-    private func notStarted(plan: TrainingPlan, start: Date) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
-                    SectionLabel(PlanTexts.goalTitle(plan.input))
-                    Text("Je plan start \(DateText.long(start))")
-                        .font(.system(size: 30, weight: .heavy))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.top, 24)
-                if let first = plan.weeks.first {
-                    ForEach(first.workouts, id: \.day) { w in
-                        let day = PlanDay(week: 0, day: w.day)
-                        NavigationLink(value: day) {
-                            WorkoutCard(workout: w, week: first, date: first.date(for: w.day),
-                                        status: .upcoming, run: nil)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .foregroundStyle(Theme.text)
-            .padding(.horizontal, Theme.margin)
-            .padding(.bottom, 24)
-        }
-    }
+    // MARK: - Na het plan
 
     private var finished: some View {
         VStack(alignment: .leading, spacing: 14) {
             SectionLabel("Plan afgerond")
             Text("Je plan zit erop")
-                .font(.system(size: 30, weight: .heavy))
+                .font(.system(size: 24, weight: .heavy))
             Text("Bekijk je resultaten in Voortgang of maak een nieuw plan via Plan › Plan beheren.")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.secondary)
             Button("Naar Plan") { openTab(.plan) }
                 .buttonStyle(PrimaryButtonStyle())
@@ -246,19 +263,20 @@ struct WeekHeader: View {
     @EnvironmentObject var model: AppModel
     let plan: TrainingPlan
     let week: PlanWeek
-    let today: PlanDay
+    /// Nil zolang het plan nog niet begonnen is.
+    let today: PlanDay?
     let selected: PlanDay
     let onSelect: (PlanDay) -> Void
 
     var body: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 10) {
+        VStack(spacing: 12) {
+            HStack(spacing: 8) {
                 ProgressRing(fraction: Double(week.number) / Double(plan.weeks.count))
-                    .frame(width: 26, height: 26)
+                    .frame(width: 20, height: 20)
                 Text("Week \(week.number)/\(plan.weeks.count)")
-                    .font(.system(size: 20, weight: .heavy))
+                    .font(.system(size: 17, weight: .heavy))
                 Text(week.isRecoveryWeek ? "rustweek" : week.phase.name.lowercased())
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.secondary)
             }
             .accessibilityElement(children: .combine)
@@ -283,6 +301,7 @@ struct WeekHeader: View {
 
     private func dayCell(_ day: PlanDay) -> some View {
         let isToday = day == today
+        let isPast = today.map { day < $0 } ?? false
         let isSelected = day == selected
         let workout = week.workout(on: day.day)
         let done = model.run(for: day) != nil
@@ -293,12 +312,12 @@ struct WeekHeader: View {
         } label: {
             VStack(spacing: 6) {
                 Text(day.day.short.uppercased())
-                    .font(.system(size: 12, weight: isToday ? .heavy : .bold))
+                    .font(.system(size: 11, weight: isToday ? .heavy : .bold))
                     .foregroundStyle(isToday ? Theme.text : Theme.secondary)
                 Text(DateText.dayNumber(date))
-                    .font(.system(size: 18, weight: isToday ? .heavy : .bold))
-                    .foregroundStyle(isToday ? Theme.background : (day < today ? Theme.secondary : Theme.text))
-                    .frame(width: 36, height: 36)
+                    .font(.system(size: 16, weight: isToday ? .heavy : .bold))
+                    .foregroundStyle(isToday ? Theme.background : (isPast ? Theme.secondary : Theme.text))
+                    .frame(width: 32, height: 32)
                     .background(isToday ? Theme.text : Color.clear, in: Circle())
                     .overlay(Circle().strokeBorder(isSelected && !isToday ? Theme.outline : Color.clear, lineWidth: 2))
                 Group {
@@ -314,7 +333,7 @@ struct WeekHeader: View {
                         Color.clear
                     }
                 }
-                .frame(width: 8, height: 8)
+                .frame(width: 7, height: 7)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
@@ -349,7 +368,7 @@ struct CoachMessageCard: View {
                             model.dismiss(message.id)
                         } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundStyle(Theme.secondary)
                                 .frame(width: 32, height: 32)
                         }
@@ -358,7 +377,7 @@ struct CoachMessageCard: View {
                     }
                 }
                 Text(message.event.message)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.text)
                     .fixedSize(horizontal: false, vertical: true)
                 if let s = message.suggestion {

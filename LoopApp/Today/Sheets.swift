@@ -17,16 +17,16 @@ struct ExtraRunSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Extra loop deze week")
-                    .font(.system(size: 26, weight: .heavy))
+                    .font(.system(size: 20, weight: .heavy))
                 Text("Een rustige loop van \(Fmt.decimal(ExtraRun.suggestedKm(in: week))) km. Telt niet mee voor de opbouw van je plan.")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if freeDays.isEmpty {
                 Text("Er is deze week geen vrije dag meer.")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.secondary)
             } else {
                 VStack(spacing: 6) {
@@ -37,7 +37,7 @@ struct ExtraRunSheet: View {
                         } label: {
                             HStack {
                                 Text(DateText.longCapitalized(week.date(for: d)))
-                                    .font(.system(size: 17, weight: .bold))
+                                    .font(.system(size: 15, weight: .bold))
                                 Spacer()
                                 CheckCircle(on: on)
                             }
@@ -56,7 +56,7 @@ struct ExtraRunSheet: View {
 
             if let picked, let warning = ExtraRun.warning(for: picked, in: week) {
                 Label(warning, systemImage: "exclamationmark.triangle")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.warn)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -90,9 +90,9 @@ struct NotFeelingSheet: View {
         VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Niet 100%")
-                    .font(.system(size: 26, weight: .heavy))
+                    .font(.system(size: 20, weight: .heavy))
                 Text("Het plan wordt tijdelijk lichter. Deze week telt niet mee voor de opbouw.")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

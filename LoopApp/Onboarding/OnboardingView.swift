@@ -111,7 +111,7 @@ struct OnboardingView: View {
         VStack(spacing: 4) {
             if step == .preview {
                 Button("Antwoorden aanpassen") { withAnimation { step = .goal } }
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Theme.muted)
                     .frame(minHeight: 44)
             }
@@ -128,7 +128,7 @@ struct OnboardingView: View {
     private func roundButton(_ icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .frame(width: 40, height: 40)
                 .background(Theme.panel, in: Circle())
         }
@@ -182,10 +182,10 @@ struct OnboardingView: View {
     private func question(_ title: String, _ subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 32, weight: .heavy))
+                .font(.system(size: 24, weight: .heavy))
                 .fixedSize(horizontal: false, vertical: true)
             Text(subtitle)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -196,7 +196,7 @@ struct OnboardingView: View {
 
     private func hint(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 14, weight: .semibold))
+            .font(.system(size: 13, weight: .semibold))
             .foregroundStyle(Theme.secondary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -254,7 +254,7 @@ struct OnboardingView: View {
                     SectionLabel("Tijd")
                     HStack(spacing: 10) {
                         NumberBox(value: $answers.minutes, unit: "min", range: 0...400, label: "Minuten")
-                        Text(":").font(.system(size: 36, weight: .black)).foregroundStyle(Theme.outline)
+                        Text(":").font(.system(size: 30, weight: .black)).foregroundStyle(Theme.outline)
                         NumberBox(value: $answers.seconds, unit: "s", range: 0...59, label: "Seconden")
                     }
                 }
@@ -265,9 +265,9 @@ struct OnboardingView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         TypeTag(type: .test)
                         Text("12 minuten zo ver mogelijk")
-                            .font(.system(size: 24, weight: .heavy))
+                            .font(.system(size: 20, weight: .heavy))
                         Text("1,5 km inlopen, 12 minuten voluit en gelijkmatig, 1 km uitlopen. Noteer de afstand na 12 minuten.")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -290,13 +290,13 @@ struct OnboardingView: View {
     private var levelResult: some View {
         if let v = answers.vdot {
             HStack {
-                StatBlock(label: "Jouw niveau", value: Fmt.decimal(v), size: 30)
+                StatBlock(label: "Jouw niveau", value: Fmt.decimal(v), size: 24)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("Voorspelde 10 km")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(Theme.secondary)
                     Text(TimeText.clock(Vdot.predictedTime(distance: 10_000, vdot: v)))
-                        .font(.system(size: 22, weight: .heavy))
+                        .font(.system(size: 19, weight: .heavy))
                         .monospacedDigit()
                 }
             }
@@ -305,7 +305,7 @@ struct OnboardingView: View {
             .background(Theme.panel, in: RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
         } else {
             Text("Deze combinatie van afstand en tijd lijkt niet te kloppen. Controleer je invoer.")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.warn)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -354,7 +354,7 @@ struct OnboardingView: View {
                 }
             }
             Text("\(n) dagen gekozen")
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Theme.secondary)
                 .frame(maxWidth: .infinity)
         }
@@ -371,7 +371,7 @@ struct OnboardingView: View {
     private func dayRow(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack {
-                Text(title).font(.system(size: 17, weight: .bold))
+                Text(title).font(.system(size: 15, weight: .bold))
                 Spacer()
                 CheckCircle(on: on)
             }
@@ -453,12 +453,12 @@ struct NumberBox: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             TextField("0", value: $value, format: .number.grouping(.never))
                 .keyboardType(.numberPad)
-                .font(.system(size: 44, weight: .black))
+                .font(.system(size: 34, weight: .black))
                 .monospacedDigit()
                 .multilineTextAlignment(.trailing)
                 .accessibilityLabel(label)
             Text(unit)
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(Theme.secondary)
                 .fixedSize()
         }
@@ -490,16 +490,16 @@ struct PlanPreview: View {
 
         return VStack(alignment: .leading, spacing: 14) {
             Text("Je plan staat klaar")
-                .font(.system(size: 32, weight: .heavy))
+                .font(.system(size: 24, weight: .heavy))
                 .accessibilityAddTraits(.isHeader)
 
             Card {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(PlanTexts.goalTitle(plan.input))
-                            .font(.system(size: 26, weight: .heavy))
+                            .font(.system(size: 20, weight: .heavy))
                         Text("\(weeks.count) weken · \(DateText.short(start)) tot \(DateText.withYear(end))")
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.secondary)
                     }
                     PhaseStrip(weeks: weeks, current: nil)
@@ -522,14 +522,14 @@ struct PlanPreview: View {
                         ForEach(first.workouts, id: \.day) { w in
                             HStack(spacing: 12) {
                                 Text(w.day.short.uppercased())
-                                    .font(.system(size: 14, weight: .heavy))
+                                    .font(.system(size: 13, weight: .heavy))
                                     .foregroundStyle(Theme.secondary)
                                     .frame(width: 30, alignment: .leading)
                                 RoundedRectangle(cornerRadius: 3).fill(w.type.color).frame(width: 10, height: 10)
-                                Text(w.title).font(.system(size: 16, weight: .bold))
+                                Text(w.title).font(.system(size: 15, weight: .bold))
                                 Spacer()
                                 Text(TimeText.distance(w.estimatedDistance(zones: first.zones)))
-                                    .font(.system(size: 16, weight: .bold))
+                                    .font(.system(size: 15, weight: .bold))
                                     .monospacedDigit()
                             }
                             .padding(.vertical, 10)
@@ -562,7 +562,7 @@ struct PhaseStrip: View {
                     let n = weeks.filter { $0.phase == p }.count
                     if n > 0 {
                         Text("\(p.name) \(n)")
-                            .font(.system(size: 12, weight: .heavy))
+                            .font(.system(size: 11, weight: .heavy))
                             .foregroundStyle(Theme.secondary)
                     }
                 }

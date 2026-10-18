@@ -31,7 +31,9 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
         default: q = "standaard"
         }
         let region = v.language == "nl-BE" ? "België" : "Nederland"
-        return "\(v.name) · \(region) · \(q)"
+        // iOS zet de kwaliteit soms al in de naam, bv. "Xander (verbeterd)".
+        let name = v.name.replacingOccurrences(of: #"\s*\(.*\)"#, with: "", options: .regularExpression)
+        return "\(name) · \(region) · \(q)"
     }
 
     override init() {
