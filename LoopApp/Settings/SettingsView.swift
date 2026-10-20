@@ -19,6 +19,23 @@ enum CueSettings {
         default: return 1
         }
     }
+
+    private static func bool(_ key: String, _ fallback: Bool) -> Bool {
+        UserDefaults.standard.object(forKey: key) as? Bool ?? fallback
+    }
+
+    /// Welke cues de engine uitspreekt, zoals ingesteld in Instellingen.
+    static var engineSettings: EngineSettings {
+        EngineSettings(blockCues: bool(blocks, true), countdown: bool(countdown, true),
+                       paceFeedback: bool(pace, true), splits: bool(splits, true),
+                       remaining: bool(remaining, false))
+    }
+
+    static var duckMusic: Bool { bool(duck, true) }
+
+    static var currentRateFactor: Float {
+        rateFactor(UserDefaults.standard.object(forKey: voiceRate) as? Int ?? 1)
+    }
 }
 
 struct SettingsView: View {

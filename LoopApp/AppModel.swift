@@ -253,6 +253,26 @@ final class AppModel: ObservableObject {
         refreshRecords()
     }
 
+    /// Bewaart een gelopen loop en geeft hem aan de coach.
+    /// Geeft de id's terug van de nieuwe meldingen, om ze meteen na de loop te tonen.
+    @discardableResult
+    func saveRun(_ run: CompletedRun) -> [UUID] {
+        guard let store else { return [] }
+        do {
+            try store.save(run)
+            runs = try store.summaries()
+        } catch {
+            errorText = "De loop kon niet bewaard worden: \(error.localizedDescription)"
+            return []
+        }
+        refreshRecords()
+        guard let result = run.coachResult else { return [] }
+        let events = mutateCoach { $0.record(result) } ?? []
+        let new = events.map { CoachMessage(event: $0) }
+        messages.append(contentsOf: new)
+        return new.map(\.id)
+    }
+
     // MARK: - Routes
 
     /// Alle loopjes met een GPS-route, nieuwste eerst (leest de routes van schijf).

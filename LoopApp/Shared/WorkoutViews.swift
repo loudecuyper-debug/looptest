@@ -75,7 +75,7 @@ struct WorkoutDetailView: View {
     @Environment(\.dismiss) private var dismiss
     let day: PlanDay
     @State private var notice: String?
-    @State private var showStartInfo = false
+    @State private var runRequest: RunRequest?
 
     var body: some View {
         Group {
@@ -93,10 +93,8 @@ struct WorkoutDetailView: View {
         } message: {
             Text(notice ?? "")
         }
-        .alert("Lopen volgt in de volgende stap", isPresented: $showStartInfo) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Lopen met GPS en stem bouwen we hierna. Tot dan kan je een loop achteraf toevoegen via Voortgang.")
+        .fullScreenCover(item: $runRequest) { request in
+            RunScreen(request: request).environmentObject(model)
         }
     }
 
@@ -146,12 +144,15 @@ struct WorkoutDetailView: View {
                 }
 
                 if canMove {
-                    Button {
-                        showStartInfo = true
-                    } label: {
-                        Label("Start workout", systemImage: "play.fill")
+                    // Lopen kan enkel op de dag zelf, zodat de loop bij de juiste dag in het plan hoort.
+                    if status == .today, model.run(for: day) == nil {
+                        Button {
+                            runRequest = RunRequest(workout: workout, day: day, zones: zones)
+                        } label: {
+                            Label("Start workout", systemImage: "play.fill")
+                        }
+                        .buttonStyle(PrimaryButtonStyle(height: 52))
                     }
-                    .buttonStyle(PrimaryButtonStyle())
 
                     if !free.isEmpty, model.run(for: day) == nil {
                         Menu {

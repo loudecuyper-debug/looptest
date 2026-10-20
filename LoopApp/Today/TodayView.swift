@@ -8,7 +8,7 @@ struct TodayView: View {
     @State private var selected: PlanDay?
     @State private var showExtra = false
     @State private var showNotFeeling = false
-    @State private var showStartInfo = false
+    @State private var runRequest: RunRequest?
 
     var body: some View {
         NavigationStack {
@@ -31,10 +31,8 @@ struct TodayView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: PlanDay.self) { WorkoutDetailView(day: $0) }
         }
-        .alert("Lopen volgt in de volgende stap", isPresented: $showStartInfo) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Lopen met GPS en stem bouwen we hierna. Tot dan kan je een loop achteraf toevoegen via Voortgang.")
+        .fullScreenCover(item: $runRequest) { request in
+            RunScreen(request: request).environmentObject(model)
         }
     }
 
@@ -90,7 +88,11 @@ struct TodayView: View {
         .safeAreaInset(edge: .bottom) {
             if !model.isSick {
                 Button {
-                    showStartInfo = true
+                    if startable, let workout {
+                        runRequest = RunRequest(workout: workout, day: day, zones: week.zones)
+                    } else {
+                        runRequest = .free
+                    }
                 } label: {
                     Label(startable ? "Start \(workout?.title.lowercased() ?? "workout")" : "Vrij lopen",
                           systemImage: "play.fill")

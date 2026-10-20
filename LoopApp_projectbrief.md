@@ -205,6 +205,16 @@ Routekaart en routes plannen (18 okt, nog te testen op de iPhone):
 - Plannen: `RoutePlanner` vraagt per stuk een wandelroute aan `MKDirections`; zonder netwerk wordt dat stuk een rechte lijn met een melding. Bewaarde routes als chips onderaan (tik = tonen, lang drukken = verwijderen); bewerken van een bewaarde route begint van het laatste punt, opnieuw bewaren overschrijft dezelfde route.
 - LoopCore: `PlannedRoute` en `RouteGeometry` (afstand met haversine, lengte, uitdunnen, afstand van een punt tot een lijn) in `PlannedRoute.swift`; `RunStore` bewaart routes in `planned-routes.json`; de backup bevat ze in het optionele veld `plannedRoutes` (oudere backups zonder dat veld laten de huidige routes staan, versie blijft 1). Tests in `PlannedRouteTests` (waarden nagerekend in Python).
 
+Stap 2 gebouwd (18 okt, voor de eerste plantraining op dinsdag 20 okt):
+- Diagnose-test thuis geslaagd (18 okt): GPS liep door met scherm uit, Live Activity startte, knoppen werkten. Daarmee is de proef afgerond.
+- `Run/RunTracker.swift`: GPS (zelfde filter als de proef), klok zonder pauzes, stem met instellingen uit Instellingen (cues, spreektempo, muziek stiller of niet), `WorkoutEngine` uit LoopCore, route als `RouteTrack`, kadans via `CMPedometer` (gemiddelde = passen / looptijd), Live Activity (afstandsblokken tonen de resterende meters als tekst, tijdsblokken tellen zelf af), knoppen op het vergrendelscherm. Na afloop een `CompletedRun`.
+- `Run/RunScreen.swift`: aftellen (10 s, annuleren mogelijk, niets bewaard), loopscherm (bloklabel in typekleur, groot resterend deel, voortgangsbalk, volgend blok, tempo in kleur met doel, afstand en totale tijd of kadans bij vrij lopen, Pauze/Hervat, Blok overslaan, Stop met bevestiging "Wat je al liep wordt bewaard"), daarna Na de loop: zwaarte 1-10 met uitleg en verwachte zwaarte per type, pijn ja/nee, notitie, Opslaan; dan samenvatting met de meldingen van de coach, routekaart, 6 cijfers, snelle blokken tegenover doel en tempo per km.
+- Starten: witte knop op Vandaag ("Start <workout>" op een trainingsdag, anders vrij lopen) en "Start workout" in de details, enkel op de dag zelf. `AppModel.saveRun` bewaart en geeft de loop aan de coach.
+- `Info.plist`: `NSMotionUsageDescription`. Versie 0.5 (build 5).
+- Nog niet: gemiste sessies automatisch melden en `finishWeek` bij een nieuwe week (volgende stap, ruim voor zondag 25 okt), loopband-modus zonder GPS.
+
+Routes plannen bijgestuurd (18 okt, na eerste test "finicky"): punten worden op de weg gelegd zoals Apple Kaarten ze plaatst (geen spieën meer van het getikte punt naar de weg), melding bij een stuk met een omweg (meer dan 2,5× en 250 m langer dan in vogelvlucht), schakelaar **Langs straten** (uit = rechte lijnen), "terug bij start" mag 25 m ernaast liggen. Vergeleken met Strava: daar ook punten verslepen, tekenen met de vinger en routes op populariteit (heatmap). Punten verslepen staat op de lijst voor na dinsdag; populariteit kan niet zonder data van anderen.
+
 Stap 2 (lopen), plan goedgekeurd 15 okt:
 - Kadans komt mee (bewegingssensor, extra toestemming). Live stats op het vergrendelscherm later, samen met de widget (vraagt een extra extensie).
 - **Volgorde (beslist 15 okt):** eerst de `WorkoutEngine` in LoopCore (testbaar in Actions). Loopscherm, `RunTracker` (GPS, klok, stem, kadans), Na de loop en gemiste sessies/`finishWeek` pas na de PoC-test op de iPhone, zodat dat deel op een bewezen basis gebouwd wordt.
@@ -264,6 +274,7 @@ Bestanden app (`LoopApp/`):
 **Gratis alternatieven bekeken (16 okt), voor als iloader ooit niet meer werkt:** Xcode op de Mac van Louis' vriendin (Personal Team, gratis, geen last van anisette) zou werken, maar valt af: te weinig schijfruimte (Xcode vraagt 30 à 40 GB). Valt ook af: PWA (geen GPS met scherm uit), macOS-VM op Windows, EU-route met alternatieve appwinkels (vraagt betaald account), TrollStore (enkel oude iOS), eigen anisette-server (veel werk, onzeker, risico op blokkade). Betaald account: nee.
 
 ## Volgende stap
+00. Dinsdag 20 okt: eerste echte plantraining met het loopscherm (rustige loop 3 km). Daarna feedback op loopscherm, Na de loop en routekaart. Dan: gemiste sessies en `finishWeek`, punten verslepen in de planner.
 0b. Live Activity-proef testen (Diagnose › intervaltest, thuis). Gaat het goed: loopscherm (stap 2) met Live Activity en de routekaart bouwen, zodat Louis ze dinsdag 20 okt kan testen tijdens de eerste plantraining.
 0. Naam en icoon pushen, nieuwe `LoopApp.ipa` installeren via iloader (Import IPA over de bestaande app heen, gegevens blijven), icoon en naam controleren.
 1. Onboarding doorlopen met echte gegevens en de schermen van stap 1 op het toestel bekijken (opmerkingen en screenshots noteren).

@@ -212,6 +212,16 @@ struct RoutesMapView: View {
     private var planPanel: some View {
         Card(padding: 14) {
             VStack(alignment: .leading, spacing: 12) {
+                Toggle(isOn: $planner.followRoads) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Langs straten").font(.system(size: 14, weight: .bold))
+                        Text(planner.followRoads ? "Volgt wegen en paden van Apple Kaarten" : "Rechte lijnen tussen je punten")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.secondary)
+                    }
+                }
+                .toggleStyle(LoopToggleStyle())
+
                 if planner.waypoints.isEmpty {
                     Text("Tik op de kaart om je startpunt te kiezen, en daarna op de plekken waar je langs wil.")
                         .font(.system(size: 14, weight: .semibold))
@@ -332,6 +342,8 @@ final class RoutePlanner: ObservableObject {
     @Published private(set) var busy = false
     @Published private(set) var note: String?
     @Published var loadedID: UUID?
+    /// Aan: elk stuk volgt straten en paden. Uit: rechte lijnen (handig in parken of op onbekende paden).
+    @Published var followRoads = true
 
     private var generation = 0
 
@@ -349,7 +361,8 @@ final class RoutePlanner: ObservableObject {
 
     var isLoop: Bool {
         guard waypoints.count > 2, let a = waypoints.first, let b = waypoints.last else { return false }
-        return RouteGeometry.distance(a.latitude, a.longitude, b.latitude, b.longitude) < 1
+        // Punten worden op de weg gelegd, dus "terug bij de start" mag een paar meter ernaast liggen.
+        return RouteGeometry.distance(a.latitude, a.longitude, b.latitude, b.longitude) < 25
     }
 
     func add(_ point: CLLocationCoordinate2D) {
@@ -361,7 +374,7 @@ final class RoutePlanner: ObservableObject {
         waypoints.append(point)
         let index = legs.count
         legs.append([last, point])   // rechte lijn tot de echte route binnen is
-        route(index, from: last, to: point)
+        if followRoads { route(index, from: last, to: point) }
     }
 
     func closeLoop() {
@@ -408,6 +421,7 @@ final class RoutePlanner: ObservableObject {
     private func route(_ index: Int, from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) {
         let token = generation
         busy = true
+        note = nil
         Task { @MainActor in
             let request = MKDirections.Request()
             request.source = MKMapItem(placemark: MKPlacemark(coordinate: a))
@@ -416,13 +430,22 @@ final class RoutePlanner: ObservableObject {
             do {
                 let response = try await MKDirections(request: request).calculate()
                 guard token == generation, index < legs.count else { return }
-                if let polyline = response.routes.first?.polyline {
+                if let polyline = response.routes.first?.polyline, polyline.pointCount > 1 {
                     var points = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid,
                                                           count: polyline.pointCount)
                     polyline.getCoordinates(&points, range: NSRange(location: 0, length: polyline.pointCount))
-                    // Begin en einde exact op de aangetikte punten, zodat de stukken aansluiten.
-                    legs[index] = [a] + points + [b]
-                    note = nil
+                    // Apple Kaarten legt de punten op de dichtstbijzijnde weg. We nemen die plek over
+                    // in plaats van het getikte punt ernaast te plakken: zo ontstaan er geen spieën.
+                    legs[index] = points
+                    if index + 1 < waypoints.count, let end = points.last { waypoints[index + 1] = end }
+                    if index == 0, let start = points.first { waypoints[0] = start }
+                    if index + 1 < legs.count, let end = points.last { legs[index + 1][0] = end }
+
+                    let straight = RouteGeometry.distance(a.latitude, a.longitude, b.latitude, b.longitude)
+                    let routed = RouteGeometry.length(latitudes: points.map(\.latitude), longitudes: points.map(\.longitude))
+                    if routed > straight * 2.5 && routed - straight > 250 {
+                        note = "Dat stuk maakt een omweg van \(Int((routed - straight).rounded())) m. Tik op Terug en zet het punt anders, of zet Langs straten uit."
+                    }
                 }
             } catch {
                 guard token == generation else { return }

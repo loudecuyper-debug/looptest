@@ -24,6 +24,8 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<false/>
+	<key>NSMotionUsageDescription</key>
+	<string>Runner telt je passen om je kadans tijdens het lopen te tonen.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>

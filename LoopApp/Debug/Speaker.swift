@@ -36,13 +36,16 @@ final class Speaker: NSObject, AVSpeechSynthesizerDelegate {
         return "\(name) · \(region) · \(q)"
     }
 
-    override init() {
+    /// `duck`: muziek even stiller zetten tijdens een cue (anders speelt ze op hetzelfde volume verder).
+    init(duck: Bool = true) {
         voice = Speaker.bestVoice()
         super.init()
         synth.delegate = self
         do {
-            try session.setCategory(.playback, mode: .voicePrompt,
-                                    options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
+            let options: AVAudioSession.CategoryOptions = duck
+                ? [.duckOthers, .interruptSpokenAudioAndMixWithOthers]
+                : [.mixWithOthers, .interruptSpokenAudioAndMixWithOthers]
+            try session.setCategory(.playback, mode: .voicePrompt, options: options)
         } catch {
             log("Audio-categorie fout: \(error.localizedDescription)")
         }

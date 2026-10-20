@@ -80,6 +80,9 @@ struct BlockClock: View {
                 Text(state.blockRemainingText ?? state.elapsedText)
             } else if let end = state.blockEnd {
                 Text(end, style: .timer)
+            } else if let left = state.blockRemainingText {
+                // Afstandsblok: meters als vaste tekst, ververst om de paar seconden.
+                Text(left)
             } else {
                 Text(state.runStart, style: .timer)
             }
