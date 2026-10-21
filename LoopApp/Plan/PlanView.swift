@@ -5,6 +5,7 @@ struct PlanView: View {
     @EnvironmentObject var model: AppModel
     @State private var showManage = false
     @State private var showOnboarding = false
+    @State private var showLevel = false
 
     var body: some View {
         NavigationStack {
@@ -27,6 +28,9 @@ struct PlanView: View {
                 Button("Annuleren", role: .cancel) {}
             } message: {
                 Text("Loopdagen, de dag van je lange loop of je doel wijzigen doe je met een nieuw plan. Dat vervangt je huidige plan en de aanpassingen van de coach. Je gelopen loopjes blijven bewaard.")
+            }
+            .sheet(isPresented: $showLevel) {
+                LevelSheet(test: nil)
             }
             .fullScreenCover(isPresented: $showOnboarding) {
                 OnboardingView(onCancel: { showOnboarding = false }) { input in
@@ -108,6 +112,13 @@ struct PlanView: View {
                     .overlay(alignment: .top) { Rectangle().fill(Theme.cardBorder).frame(height: 1) }
                     .accessibilityElement(children: .combine)
                 }
+                Button {
+                    showLevel = true
+                } label: {
+                    Label("Niveau aanpassen", systemImage: "slider.horizontal.3")
+                }
+                .buttonStyle(SecondaryButtonStyle(height: 44))
+                .padding(.top, 10)
             }
         }
     }

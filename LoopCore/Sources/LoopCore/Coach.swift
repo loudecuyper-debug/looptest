@@ -46,6 +46,11 @@ public struct Coach: Codable, Equatable, Sendable {
 
     /// Registreer een loop (of een overgeslagen workout) en krijg terug wat de coach te zeggen heeft.
     public mutating func record(_ result: RunResult) -> [CoachEvent] {
+        record(result, notBefore: nil)
+    }
+
+    /// `notBefore`: een gemiste sessie mag enkel naar deze dag of later schuiven (gemist pas achteraf gemerkt).
+    mutating func record(_ result: RunResult, notBefore: PlanDay?) -> [CoachEvent] {
         state.results.append(result)
         guard let plan = self.plan(), result.when.week < plan.weeks.count else { return [] }
         let w = result.when.week
@@ -53,7 +58,7 @@ public struct Coach: Codable, Equatable, Sendable {
         guard let workout = week.workout(on: result.when.day) else { return [] }   // vrije loop
 
         if result.status == .skipped {
-            return handleSkip(workout, weekIndex: w, plan: plan)
+            return handleSkip(workout, weekIndex: w, plan: plan, notBefore: notBefore)
         }
 
         var events: [CoachEvent] = []
@@ -76,6 +81,51 @@ public struct Coach: Codable, Equatable, Sendable {
     /// Antwoord "ja" op een niveauvoorstel.
     public mutating func accept(_ suggestion: LevelSuggestion) {
         state.levelChanges.append(LevelChange(fromWeek: suggestion.fromWeek, vdot: suggestion.newVdot))
+    }
+
+    /// Niveau zelf aanpassen vanaf een week (via Plan of na een niveautest, zie `LevelTest`).
+    /// Telt als niveauwijziging: de coach doet de 2 weken erna geen nieuw tempovoorstel.
+    public mutating func setLevel(_ vdot: Double, fromWeek week: Int) {
+        let value = min(max(vdot, LevelTest.allowedRange.lowerBound), LevelTest.allowedRange.upperBound)
+        let w = max(0, week)
+        state.levelChanges.append(LevelChange(fromWeek: w, vdot: value))
+        state.lastLevelChangeWeek = w
+    }
+
+    // MARK: - Bijwerken tot vandaag (20 okt)
+
+    /// Noteert geplande trainingen van vóór `today` zonder loop als gemist (met de gewone regels:
+    /// rustig valt weg, kwaliteit en lange loop schuiven naar een vrije dag vanaf vandaag) en sluit
+    /// elke week af waarvan de zondag voorbij is. Elke dag wordt maar één keer verwerkt
+    /// (`processedThrough`), dus de app mag dit bij elke start en elke terugkeer aanroepen.
+    /// Extra loopjes tellen niet: die worden niet als gemist genoteerd.
+    public mutating func catchUp(until today: PlanDay) -> [CoachEvent] {
+        guard let start = plan() else { return [] }
+        let end = min(today.index, start.weeks.count * 7)
+        var i = (state.processedThrough ?? -1) + 1
+        var events: [CoachEvent] = []
+        while i < end {
+            let d = PlanDay(index: i)
+            if let plan = self.plan(), d.week < plan.weeks.count,
+               let workout = plan.weeks[d.week].workout(on: d.day), !workout.isExtra,
+               !state.results.contains(where: { $0.when == d }) {
+                events += record(RunResult(when: d, status: .skipped), notBefore: today)
+            }
+            state.processedThrough = i
+            if d.day == .sunday { events += finishWeek(d.week) }
+            i += 1
+        }
+        return events
+    }
+
+    /// Een loop die achteraf aan een geplande training gekoppeld wordt (bv. een vrije loop op die dag).
+    /// Stond die dag al als gemist, dan vervalt dat, samen met de verplaatsing die het gemis veroorzaakte.
+    public mutating func recordLinked(_ result: RunResult) -> [CoachEvent] {
+        if let i = state.results.firstIndex(where: { $0.when == result.when && $0.status == .skipped }) {
+            state.results.remove(at: i)
+            state.update(week: result.when.week) { $0.moves[result.when.day] = nil }
+        }
+        return record(result)
     }
 
     /// Op het einde van een week (of bij het openen van de app in een nieuwe week).
@@ -285,13 +335,15 @@ public struct Coach: Codable, Equatable, Sendable {
                             predicted10k: Vdot.predictedTime(distance: 10_000, vdot: newVdot))]
     }
 
-    private mutating func handleSkip(_ workout: PlannedWorkout, weekIndex w: Int, plan: TrainingPlan) -> [CoachEvent] {
+    private mutating func handleSkip(_ workout: PlannedWorkout, weekIndex w: Int, plan: TrainingPlan,
+                                     notBefore: PlanDay? = nil) -> [CoachEvent] {
         let week = plan.weeks[w]
+        let allowed: (Weekday) -> Bool = { d in notBefore.map { PlanDay(week: w, day: d) >= $0 } ?? true }
         switch workout.type {
         case .easy, .recovery, .test:
             return []
         case .long, .progression:
-            if let to = Coach.freeSlot(for: workout.day, in: week) {
+            if let to = Coach.freeSlot(for: workout.day, in: week, allowed: allowed) {
                 move(from: workout.day, to: to, weekIndex: w)
                 return [.sessionMoved(title: workout.title, to: to)]
             }
@@ -301,7 +353,7 @@ public struct Coach: Codable, Equatable, Sendable {
             }
             return []
         case .tempo, .interval, .fartlek:
-            if let to = Coach.freeSlot(for: workout.day, in: week) {
+            if let to = Coach.freeSlot(for: workout.day, in: week, allowed: allowed) {
                 move(from: workout.day, to: to, weekIndex: w)
                 return [.sessionMoved(title: workout.title, to: to)]
             }
@@ -344,13 +396,15 @@ public struct Coach: Codable, Equatable, Sendable {
     }
 
     /// Eerste vrije dag na `day` in deze week die niet naast een zware dag ligt.
-    static func freeSlot(for day: Weekday, in week: PlanWeek) -> Weekday? {
+    /// `allowed`: extra voorwaarde, bv. niet in het verleden.
+    static func freeSlot(for day: Weekday, in week: PlanWeek,
+                         allowed: (Weekday) -> Bool = { _ in true }) -> Weekday? {
         func isHard(_ d: Weekday) -> Bool {
             guard d != day, let w = week.workout(on: d) else { return false }
             return Coach.isHard(w)
         }
         return Weekday.allCases.first { d in
-            guard d > day, week.workout(on: d) == nil else { return false }
+            guard d > day, allowed(d), week.workout(on: d) == nil else { return false }
             let before = Weekday(rawValue: d.rawValue - 1).map(isHard) ?? false
             let after = Weekday(rawValue: d.rawValue + 1).map(isHard) ?? false
             return !before && !after

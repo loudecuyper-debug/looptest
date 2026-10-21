@@ -2,8 +2,9 @@ import SwiftUI
 import UniformTypeIdentifiers
 import LoopCore
 
-/// Keuzes voor de stem en de cues. De cues zelf gebruiken we vanaf de volgende stap (lopen).
+/// Keuzes voor wat je hoort tijdens het lopen: stem, signalen of beide, en welke momenten.
 enum CueSettings {
+    static let mode = "cueMode"                 // 0 stem, 1 signalen (standaard), 2 beide
     static let voiceRate = "voiceRate"          // 0 trager, 1 normaal, 2 sneller
     static let blocks = "cueBlocks"
     static let countdown = "cueCountdown"
@@ -11,6 +12,7 @@ enum CueSettings {
     static let splits = "cueSplits"
     static let remaining = "cueRemaining"
     static let duck = "duckMusic"
+    static let autoPause = "autoPause"
 
     static func rateFactor(_ setting: Int) -> Float {
         switch setting {
@@ -33,6 +35,9 @@ enum CueSettings {
 
     static var duckMusic: Bool { bool(duck, true) }
 
+    /// Automatisch pauzeren bij stilstaan (standaard aan).
+    static var autoPauseEnabled: Bool { bool(autoPause, true) }
+
     static var currentRateFactor: Float {
         rateFactor(UserDefaults.standard.object(forKey: voiceRate) as? Int ?? 1)
     }
@@ -41,6 +46,7 @@ enum CueSettings {
 struct SettingsView: View {
     @EnvironmentObject var model: AppModel
 
+    @AppStorage(CueSettings.mode) private var cueMode = CueMode.signals.rawValue
     @AppStorage(CueSettings.voiceRate) private var voiceRate = 1
     @AppStorage(CueSettings.blocks) private var cueBlocks = true
     @AppStorage(CueSettings.countdown) private var cueCountdown = true
@@ -48,6 +54,7 @@ struct SettingsView: View {
     @AppStorage(CueSettings.splits) private var cueSplits = true
     @AppStorage(CueSettings.remaining) private var cueRemaining = false
     @AppStorage(CueSettings.duck) private var duckMusic = true
+    @AppStorage(CueSettings.autoPause) private var autoPause = true
 
     @State private var speaker: Speaker?
     @State private var exportDocument: BackupDocument?
@@ -59,10 +66,12 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    voiceCard
+                    modeCard
+                    if cueMode != CueMode.voice.rawValue { signalsCard }
+                    if cueMode != CueMode.signals.rawValue { voiceCard }
                     cuesCard
+                    runCard
                     backupCard
-                    diagnoseCard
                     Text("Runner \(appVersion) · alles lokaal, geen account")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Theme.tertiary)
@@ -105,6 +114,65 @@ struct SettingsView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(notice ?? "")
+            }
+        }
+    }
+
+    // MARK: - Stem of signalen
+
+    private var modeCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionLabel("Tijdens het lopen", color: Theme.muted)
+                Segmented(options: [(CueMode.voice.rawValue, "Stem"), (CueMode.signals.rawValue, "Signalen"),
+                                    (CueMode.both.rawValue, "Beide")],
+                          selection: $cueMode, height: 36)
+                Text(modeExplanation)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var modeExplanation: String {
+        switch CueMode(rawValue: cueMode) ?? .signals {
+        case .voice: return "Een stem zegt elk blok, je tempo en je kilometertijden."
+        case .signals: return "Korte geluidjes in plaats van de stem. Stijgend betekent sneller, dalend rustiger. Wat er precies loopt, zie je op je vergrendelscherm."
+        case .both: return "Eerst het geluidje, daarna de stem."
+        }
+    }
+
+    private var signalsCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 0) {
+                SectionLabel("Signalen beluisteren", color: Theme.muted).padding(.bottom, 6)
+                ForEach(RunSignal.allCases) { signal in
+                    Button {
+                        let s = speaker ?? Speaker(duck: duckMusic)
+                        speaker = s
+                        if signal == .aftel {
+                            s.play(.aftel)
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { s.play(.aftel) }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { s.play(.aftel) }
+                        } else {
+                            s.play(signal)
+                        }
+                    } label: {
+                        HStack {
+                            Text(signal.title).font(.system(size: 15, weight: .bold))
+                            Spacer()
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: 22))
+                                .foregroundStyle(Theme.secondary)
+                        }
+                        .frame(minHeight: 46)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .overlay(alignment: .top) { divider }
+                    .accessibilityLabel("Speel \(signal.title)")
+                }
             }
         }
     }
@@ -158,13 +226,24 @@ struct SettingsView: View {
     private var cuesCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 0) {
-                SectionLabel("Wat de stem zegt", color: Theme.muted).padding(.bottom, 10)
+                SectionLabel("Wat je hoort", color: Theme.muted).padding(.bottom, 10)
                 toggleRow("Begin en einde van elk blok", nil, $cueBlocks)
-                toggleRow("Aftellen", "Nog 100 meter, nog 10 seconden", $cueCountdown)
+                toggleRow("Aftellen", "Signalen: de laatste 3 seconden voor een snel blok. Stem: nog 100 meter, nog 10 seconden", $cueCountdown)
                 toggleRow("Tempo te snel of te traag", "Hooguit één keer per halve minuut", $cuePace)
                 toggleRow("Tijd per kilometer", nil, $cueSplits)
                 toggleRow("Intervallen nog te gaan", nil, $cueRemaining)
                 toggleRow("Muziek stiller tijdens cues", "Spotify en Apple Music", $duckMusic)
+            }
+        }
+    }
+
+    // MARK: - Lopen
+
+    private var runCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 0) {
+                SectionLabel("Lopen", color: Theme.muted).padding(.bottom, 10)
+                toggleRow("Automatisch pauzeren", "Bij stilstaan, bv. aan een verkeerslicht. Niet tijdens snelle blokken en herstel, daar loopt de klok door.", $autoPause)
             }
         }
     }
@@ -257,34 +336,6 @@ struct SettingsView: View {
             notice = "Deze backup komt uit een nieuwere versie van de app en kan niet teruggezet worden."
         } catch {
             notice = "Terugzetten mislukt. Is dit wel een LoopApp-backup?"
-        }
-    }
-
-    // MARK: - Diagnose
-
-    private var diagnoseCard: some View {
-        Card {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionLabel("Diagnose", color: Theme.muted)
-                NavigationLink {
-                    DebugRunScreen()
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("GPS en stem testen").font(.system(size: 15, weight: .bold))
-                            Text("Intervaltest of vrij lopen met diagnose")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
-                    }
-                    .foregroundStyle(Theme.text)
-                    .frame(minHeight: 48)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
         }
     }
 

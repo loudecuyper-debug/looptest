@@ -33,7 +33,8 @@ public struct PlanInput: Codable, Equatable, Sendable {
     /// Doelafstand in meter (bv. 10 000).
     public var goalDistance: Double
     public var weeks: Int
-    /// Startdatum. De generator schuift die op naar de eerstvolgende maandag.
+    /// Dag waarop het plan gemaakt werd. Week 1 begint op de maandag van die week
+    /// (dagen ervoor vallen weg), of de maandag erna als er die week geen loopdag meer over is.
     public var startDate: Date
     /// Recente prestatie waaruit het niveau berekend wordt.
     public var recentDistance: Double
@@ -243,6 +244,37 @@ public enum PlanCalendar {
         let weekday = calendar.component(.weekday, from: start)   // zondag = 1, maandag = 2
         let offset = (9 - weekday) % 7
         return calendar.date(byAdding: .day, value: offset, to: start) ?? start
+    }
+
+    /// Maandag van de week waarin `date` valt (begin van de dag).
+    public static func monday(of date: Date, calendar: Calendar = PlanCalendar.default) -> Date {
+        let start = calendar.startOfDay(for: date)
+        let offset = weekday(of: start, calendar: calendar).rawValue
+        return calendar.date(byAdding: .day, value: -offset, to: start) ?? start
+    }
+
+    /// Weekdag van een datum.
+    public static func weekday(of date: Date, calendar: Calendar = PlanCalendar.default) -> Weekday {
+        // Calendar: zondag = 1, maandag = 2 ... zaterdag = 7.
+        let raw = (calendar.component(.weekday, from: date) + 5) % 7
+        return Weekday(rawValue: raw) ?? .monday
+    }
+
+    /// Maandag van week 1. Het plan start in de week waarin het gemaakt wordt, zolang er
+    /// vanaf die dag nog een loopdag over is; anders de maandag erna.
+    public static func planStart(for date: Date, runDays: [Weekday],
+                                 calendar: Calendar = PlanCalendar.default) -> Date {
+        let today = weekday(of: date, calendar: calendar)
+        if runDays.contains(where: { $0 >= today }) { return monday(of: date, calendar: calendar) }
+        return nextMonday(onOrAfter: date, calendar: calendar)
+    }
+
+    /// Eerste dag van het plan: de startdag zelf als het plan in die week begint, anders maandag.
+    /// Loopdagen in week 1 vóór deze dag vallen weg.
+    public static func firstPlanDay(for date: Date, runDays: [Weekday],
+                                    calendar: Calendar = PlanCalendar.default) -> Weekday {
+        let start = planStart(for: date, runDays: runDays, calendar: calendar)
+        return start < calendar.startOfDay(for: date) ? weekday(of: date, calendar: calendar) : .monday
     }
 }
 

@@ -38,6 +38,7 @@ enum AppTab: Hashable {
 
 struct RootView: View {
     @EnvironmentObject var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var tab: AppTab = .today
 
     var body: some View {
@@ -67,6 +68,9 @@ struct RootView: View {
             }
         }
         .background(Theme.background.ignoresSafeArea())
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { model.catchUp() }
+        }
         .alert("Er liep iets mis", isPresented: Binding(present: $model.errorText)) {
             Button("OK", role: .cancel) {}
         } message: {

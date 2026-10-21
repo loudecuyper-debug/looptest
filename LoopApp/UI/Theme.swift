@@ -36,17 +36,20 @@ extension Color {
 // MARK: - Kleur en naam per type
 
 extension WorkoutType {
-    var color: Color {
+    /// Typekleur als hex, ook doorgegeven aan de Live Activity (die geen SwiftUI-kleuren deelt).
+    var hex: UInt32 {
         switch self {
-        case .easy, .recovery: return Theme.good
-        case .long: return Color(hex: 0x5B8CFF)
-        case .tempo: return Color(hex: 0xF2B32A)
-        case .interval: return Color(hex: 0xFF6B3D)
-        case .fartlek: return Color(hex: 0xE05BA0)
-        case .progression: return Color(hex: 0x9B7BFF)
-        case .test: return Color(hex: 0xF0524F)
+        case .easy, .recovery: return 0x4CC38A
+        case .long: return 0x5B8CFF
+        case .tempo: return 0xF2B32A
+        case .interval: return 0xFF6B3D
+        case .fartlek: return 0xE05BA0
+        case .progression: return 0x9B7BFF
+        case .test: return 0xF0524F
         }
     }
+
+    var color: Color { Color(hex: hex) }
 
     var label: String {
         switch self {

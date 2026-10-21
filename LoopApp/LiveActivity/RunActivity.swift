@@ -25,6 +25,30 @@ struct RunActivityAttributes: ActivityAttributes {
         var finished: Bool
         /// Of "Blok overslaan" kan (niet bij vrij lopen of in het laatste blok tijdens het aftellen).
         var canSkip: Bool
+
+        // Ontwerp 20 okt (canvas "Runner loopscherm", rij Live Activity). Met standaardwaarden.
+
+        /// Vrij lopen: tijd, afstand en tempo naast elkaar in plaats van een blok.
+        var isFreeRun: Bool = false
+        /// Aftellen voor de start.
+        var isCountdown: Bool = false
+        /// Kleur van het blok als hex (typekleur, groen voor rustig en herstel, oranje bij vrij lopen).
+        var blockColor: UInt32 = 0xFF7A1A
+        /// Begin van een tijdsblok, samen met `blockEnd` voor een balk die zelf vooruitgaat.
+        var blockStart: Date? = nil
+        /// Voortgang van een afstandsblok (0 tot 1), ververst om de paar seconden.
+        var progress: Double? = nil
+        /// Tempo zonder eenheid, bv. "4:39".
+        var paceValue: String? = nil
+        /// 0 onbekend, 1 op tempo, 2 te snel, 3 te traag: kleur van het tempo.
+        var paceStatus: Int = 0
+        /// Bv. "op tempo · doel 4:35 – 4:44".
+        var targetText: String? = nil
+        /// Korte regel rechtsboven: vrij lopen "km 4 · vorige 4:28", pauze "interval 3 van 5 · nog 420 m".
+        var infoText: String? = nil
+        /// Derde cijfer van de samenvatting op het einde, bv. ("GEM. TEMPO", "5:23").
+        var summaryLabel: String = "GEM. TEMPO"
+        var summaryValue: String? = nil
     }
 
     /// Naam van de workout, bv. "Intervaltest".

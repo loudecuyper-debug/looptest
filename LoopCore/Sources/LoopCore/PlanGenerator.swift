@@ -9,6 +9,8 @@ import Foundation
 /// - Kwaliteit: 1 sessie per week; met 4+ loopdagen een tweede (tempo) in zwaarder en piek.
 /// - Kwaliteitsdagen zo ver mogelijk van de lange loop en van elkaar.
 /// - Laatste week: tijdrit over de doelafstand.
+/// - Start: in de week waarin het plan gemaakt wordt; loopdagen die al voorbij zijn vallen weg.
+///   Is er die week geen loopdag meer over, dan start het plan de maandag erna.
 ///
 /// Aanpassingen van de coach (`AdaptationState`) worden bij elke berekening toegepast:
 /// niveau per week, bevroren weken, verschoven rustweken, verplaatste sessies,
@@ -36,7 +38,8 @@ public enum PlanGenerator {
         guard days.count >= 2, days.contains(input.longRunDay), input.weeks >= 4 else { return nil }
 
         let phases = phaseList(weeks: input.weeks)
-        let monday = PlanCalendar.nextMonday(onOrAfter: input.startDate, calendar: calendar)
+        let monday = PlanCalendar.planStart(for: input.startDate, runDays: days, calendar: calendar)
+        let firstDay = PlanCalendar.firstPlanDay(for: input.startDate, runDays: days, calendar: calendar)
         let startVolume = max(input.weeklyVolumeKm, 5)
         let peakVolume = min(startVolume * 1.6, startVolume + 15)
         let longCap = longRunCapKm(goalDistance: input.goalDistance)
@@ -115,6 +118,9 @@ public enum PlanGenerator {
             }
 
             workouts = apply(adj, week: w, to: workouts, sickPeriods: adaptation.sickPeriods)
+
+            // Week 1 begint op de dag dat het plan gemaakt werd: eerdere dagen vallen weg.
+            if w == 0 { workouts.removeAll { $0.day < firstDay } }
 
             let start = calendar.date(byAdding: .day, value: 7 * w, to: monday) ?? monday
             weeks.append(PlanWeek(number: w + 1, phase: phase, isRecoveryWeek: isRecovery,

@@ -173,8 +173,17 @@ struct VoortgangView: View {
                         .padding(.vertical, 6)
                 } else {
                     ForEach(model.runs) { run in
-                        runRow(run)
+                        NavigationLink {
+                            RunPager(start: run.id)
+                        } label: {
+                            runRow(run)
+                        }
+                        .buttonStyle(.plain)
                     }
+                    Text("Tik op een loop voor alle details. Lang drukken om te verwijderen.")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.tertiary)
+                        .padding(.top, 8)
                 }
             }
         }
@@ -201,6 +210,9 @@ struct VoortgangView: View {
                     .foregroundStyle(Theme.secondary)
                     .monospacedDigit()
             }
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Theme.tertiary)
         }
         .padding(.vertical, 10)
         .overlay(alignment: .top) { Rectangle().fill(Theme.cardBorder).frame(height: 1) }

@@ -201,6 +201,9 @@ public struct AdaptationState: Codable, Equatable, Sendable {
     public var levelChanges: [LevelChange] = []
     public var sickPeriods: [SickPeriod] = []
     public var results: [RunResult] = []
+    /// Laatste plandag (index) die `Coach.catchUp` verwerkte: gemist genoteerd en, op zondag, de week afgesloten.
+    /// Optioneel, zodat oudere bewaarde gegevens zonder dit veld gewoon inladen.
+    public var processedThrough: Int?
 
     // Geheugen voor de regels
     var qualitySignals: [Int] = []

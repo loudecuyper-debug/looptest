@@ -19,6 +19,10 @@ struct RunScreen: View {
     @StateObject private var tracker: RunTracker
     @State private var started = false
     @State private var confirmStop = false
+    @State private var page = 0
+    @State private var locked = false
+    @State private var holding = false
+    @State private var camera: MapCameraPosition = .userLocation(fallback: .automatic)
 
     init(request: RunRequest) {
         _tracker = StateObject(wrappedValue: RunTracker(workout: request.workout, planDay: request.day,
@@ -81,68 +85,137 @@ struct RunScreen: View {
         }
     }
 
-    // MARK: - Lopen
+    // MARK: - Lopen (ontwerp 20 okt: drie pagina's om tussen te swipen, vergrendelknop)
 
     private var live: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 6) {
-                HStack {
-                    Text(tracker.currentLabel)
-                        .font(.system(size: 13, weight: .heavy))
-                        .tracking(1)
-                        .foregroundStyle(labelColor)
-                    Spacer()
-                    if tracker.paused {
-                        Text("GEPAUZEERD")
-                            .font(.system(size: 12, weight: .heavy))
-                            .foregroundStyle(Theme.accent)
-                    } else {
-                        gpsBadge
+            header
+                .padding(.horizontal, Theme.margin)
+                .padding(.top, 14)
+
+            TabView(selection: $page) {
+                numbersPage.tag(0)
+                mapPage.tag(1)
+                kmPage.tag(2)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .allowsHitTesting(!locked)
+
+            pageDots.padding(.vertical, 10)
+
+            Group {
+                if locked { unlockControl } else { controls }
+            }
+            .padding(.horizontal, Theme.margin)
+            .padding(.bottom, 12)
+        }
+        .confirmationDialog("Loop stoppen?", isPresented: $confirmStop, titleVisibility: .visible) {
+            Button(tracker.tooShortToSave ? "Stoppen zonder bewaren" : "Stoppen en bewaren", role: .destructive) {
+                tracker.stop()
+            }
+            Button("Verder lopen", role: .cancel) {}
+        } message: {
+            Text(tracker.tooShortToSave
+                 ? "Je liep nog geen 100 m. Deze loop wordt niet bewaard."
+                 : "Wat je al liep wordt bewaard.")
+        }
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            Text(tracker.currentLabel)
+                .font(.system(size: 13, weight: .heavy))
+                .tracking(1.2)
+                .foregroundStyle(labelColor)
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            if tracker.paused {
+                Text(tracker.autoPaused ? "AUTOPAUZE" : "GEPAUZEERD")
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(Theme.accent)
+            } else if locked {
+                Text("VERGRENDELD")
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(Theme.accent)
+            } else {
+                gpsBadge
+            }
+            if !locked {
+                Button {
+                    withAnimation(.snappy) { locked = true }
+                } label: {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .frame(width: 36, height: 36)
+                        .background(Theme.sunken, in: Circle())
+                        .overlay(Circle().strokeBorder(Theme.outline, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Scherm vergrendelen")
+            }
+        }
+        .frame(minHeight: 36)
+    }
+
+    // Pagina 1: cijfers
+
+    private var numbersPage: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if !tracker.engine.isFreeRun, !tracker.overview.isEmpty {
+                OverviewStrip(segments: tracker.overview, title: tracker.workout?.title ?? "")
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                SectionLabel(bigLabel)
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(bigText)
+                        .font(.system(size: 76, weight: .black))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
+                    if let of = ofText {
+                        Text(of)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Theme.secondary)
+                            .lineLimit(1)
                     }
                 }
-                Text(bigText)
-                    .font(.system(size: 84, weight: .black))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 if !tracker.engine.isFreeRun {
                     Bar(fraction: tracker.stepProgress, color: labelColor, height: 6)
+                        .padding(.top, 6)
                 }
                 if let next = tracker.nextText {
                     Text(next)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 4)
+                        .lineLimit(1)
+                        .padding(.top, 2)
                 }
             }
-            .padding(.horizontal, Theme.margin)
-            .padding(.top, 18)
 
-            paceCard
-                .padding(.horizontal, Theme.margin)
-                .padding(.top, 20)
-
-            HStack {
-                StatBlock(label: "Afstand", value: Format.km(tracker.distance), size: 24)
-                StatBlock(label: tracker.engine.isFreeRun ? "Kadans" : "Totaal", value: secondStat, size: 24)
+            if let plan = tracker.schedule {
+                ScheduleCard(offset: plan.offset, goal: plan.goal, projected: plan.projected)
+            } else {
+                paceCard
             }
-            .padding(.horizontal, Theme.margin)
-            .padding(.top, 18)
 
-            Spacer()
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+                      alignment: .leading, spacing: 14) {
+                ForEach(gridStats) { s in
+                    StatBlock(label: s.label, value: s.value, size: 24)
+                }
+            }
+            .padding(.horizontal, 4)
 
-            controls
-                .padding(.horizontal, Theme.margin)
-                .padding(.bottom, 12)
+            Spacer(minLength: 0)
         }
-        .confirmationDialog("Loop stoppen?", isPresented: $confirmStop, titleVisibility: .visible) {
-            Button("Stoppen en bewaren", role: .destructive) { tracker.stop() }
-            Button("Verder lopen", role: .cancel) {}
-        } message: {
-            Text("Wat je al liep wordt bewaard.")
-        }
+        .padding(.horizontal, Theme.margin)
+        .padding(.top, 14)
+    }
+
+    private var bigLabel: String {
+        if tracker.engine.isFreeRun { return "Tijd" }
+        return tracker.schedule != nil ? "Nog te gaan" : "Nog in dit blok"
     }
 
     private var bigText: String {
@@ -154,18 +227,185 @@ struct RunScreen: View {
         }
     }
 
-    private var secondStat: String {
-        if tracker.engine.isFreeRun {
-            return tracker.cadence.map { "\(Int($0.rounded())) spm" } ?? "–"
+    /// "van 800 m", "van 3:00", leeg bij een tijdrit (de grote afstand zegt genoeg).
+    private var ofText: String? {
+        guard !tracker.engine.isFreeRun, tracker.schedule == nil, let s = tracker.engine.currentStep else { return nil }
+        switch s.step.length {
+        case .distance(let m): return "van " + (m >= 1000 ? Fmt.km2(m) : "\(Int(m)) m")
+        case .time(let t): return "van " + Format.clock(t)
         }
-        return Format.clock(tracker.elapsed)
+    }
+
+    private var gridStats: [GridStat] {
+        let cadence = tracker.cadence.map { "\(Int($0.rounded())) spm" } ?? "–"
+        if tracker.engine.isFreeRun {
+            let km = tracker.currentKm
+            return [GridStat("Afstand", Format.km(tracker.distance)),
+                    GridStat("Gem. tempo", tracker.averagePace.map { TimeText.clock($0) } ?? "–"),
+                    GridStat("Km \(km.number)", km.pace.map { TimeText.clock($0) } ?? "–"),
+                    GridStat("Kadans", cadence)]
+        }
+        if tracker.schedule != nil {
+            return [GridStat("Gem. tempo", tracker.blockPace.map { TimeText.clock($0) } ?? "–"),
+                    GridStat("Gelopen", Format.km(tracker.distance)),
+                    GridStat("Tijd", Format.clock(tracker.elapsed)),
+                    GridStat("Kadans", cadence)]
+        }
+        return [GridStat("Gem. dit blok", tracker.blockPace.map { TimeText.clock($0) } ?? "–"),
+                GridStat("Afstand", Format.km(tracker.distance)),
+                GridStat("Totale tijd", Format.clock(tracker.elapsed)),
+                GridStat("Kadans", cadence)]
+    }
+
+    private var paceCard: some View {
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        SectionLabel("Tempo nu")
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text(tracker.currentPace.map { TimeText.clock($0) } ?? "-:--")
+                                .font(.system(size: 34, weight: .heavy))
+                                .monospacedDigit()
+                                .foregroundStyle(paceColor)
+                            Text("/km")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(Theme.secondary)
+                        }
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(paceHint)
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(paceColor)
+                        if let r = tracker.targetRange, !tracker.engine.isFreeRun {
+                            Text(tracker.currentStepIsEasy ? "trager dan \(TimeText.clock(r.fast))" : "doel \(TimeText.range(r))")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Theme.secondary)
+                        }
+                    }
+                }
+                if let r = tracker.targetRange, !tracker.engine.isFreeRun {
+                    PaceMeter(pace: tracker.currentPace, range: r, easy: tracker.currentStepIsEasy)
+                }
+            }
+        }
+    }
+
+    // Pagina 2: kaart
+
+    private var mapPage: some View {
+        VStack(spacing: 12) {
+            compactNow
+            ZStack(alignment: .bottom) {
+                Map(position: $camera) {
+                    if tracker.route.count > 1 {
+                        MapPolyline(coordinates: tracker.route).stroke(Theme.accent, lineWidth: 5)
+                    }
+                    UserAnnotation()
+                }
+                .mapStyle(.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll))
+                .allowsHitTesting(false)   // anders botst slepen op de kaart met swipen tussen de pagina's
+
+                HStack(spacing: 8) {
+                    mapStat("Afstand", Format.km(tracker.distance))
+                    mapStat("Tijd", Format.clock(tracker.elapsed))
+                    mapStat("Gem.", tracker.averagePace.map { TimeText.clock($0) } ?? "–")
+                }
+                .padding(12)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous).strokeBorder(Theme.cardBorder, lineWidth: 1))
+        }
+        .padding(.horizontal, Theme.margin)
+        .padding(.top, 14)
+    }
+
+    private func mapStat(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label.uppercased())
+                .font(.system(size: 10, weight: .heavy))
+                .tracking(1)
+                .foregroundStyle(Theme.secondary)
+            Text(value)
+                .font(.system(size: 17, weight: .heavy))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Theme.background.opacity(0.86), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    /// Kleine versie van het belangrijkste: resterend (of tijd) en tempo.
+    private var compactNow: some View {
+        VStack(spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(bigText)
+                    .font(.system(size: 40, weight: .black))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Spacer()
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(tracker.currentPace.map { TimeText.clock($0) } ?? "-:--")
+                        .font(.system(size: 24, weight: .heavy))
+                        .monospacedDigit()
+                        .foregroundStyle(paceColor)
+                    Text("/km")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Theme.secondary)
+                }
+            }
+            if !tracker.engine.isFreeRun {
+                Bar(fraction: tracker.stepProgress, color: labelColor, height: 6)
+            }
+        }
+    }
+
+    // Pagina 3: kilometers en snelle blokken
+
+    private var kmPage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                compactNow
+                LiveSplitsCard(splits: tracker.engine.splits, current: tracker.currentKm)
+                let work = tracker.engine.blocks.filter { $0.kind == .work }
+                if !work.isEmpty || tracker.engine.currentStep?.kind == .work {
+                    LiveBlocksCard(blocks: work,
+                                   currentPace: tracker.engine.currentStep?.kind == .work ? tracker.blockPace : nil,
+                                   currentDistance: tracker.distance - tracker.engine.stepStartDistance,
+                                   range: tracker.engine.currentStep?.kind == .work ? tracker.targetRange : nil)
+                }
+            }
+            .padding(.horizontal, Theme.margin)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+        }
+    }
+
+    private var pageDots: some View {
+        HStack(spacing: 7) {
+            ForEach(0..<3, id: \.self) { i in
+                Capsule()
+                    .fill(i == page ? Theme.text : Theme.outline)
+                    .frame(width: i == page ? 18 : 6, height: 6)
+            }
+        }
+        .animation(.snappy, value: page)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Pagina \(page + 1) van 3: \(["cijfers", "kaart", "kilometers"][page])")
     }
 
     private var labelColor: Color {
-        tracker.currentStepIsEasy ? Theme.good : (tracker.workout?.type.color ?? Theme.accent)
+        if tracker.engine.isFreeRun { return Theme.accent }
+        return Color(hex: tracker.hex(for: tracker.engine.currentStep))
     }
 
     private var paceColor: Color {
+        if tracker.engine.isFreeRun { return Theme.text }
         switch tracker.paceStatus {
         case .onPace: return Theme.good
         case .tooFast: return Theme.accent
@@ -175,39 +415,12 @@ struct RunScreen: View {
     }
 
     private var paceHint: String {
+        if tracker.engine.isFreeRun { return tracker.currentPace == nil ? "Tempo zoeken…" : "" }
         switch tracker.paceStatus {
         case .onPace: return "Op tempo"
         case .tooFast: return tracker.currentStepIsEasy ? "Rustiger" : "Iets rustiger"
         case .tooSlow: return "Iets sneller"
         case .unknown: return "Tempo zoeken…"
-        }
-    }
-
-    private var paceCard: some View {
-        Card(padding: 16) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("TEMPO")
-                        .font(.system(size: 11, weight: .heavy))
-                        .tracking(1)
-                        .foregroundStyle(Theme.secondary)
-                    Text(Format.paceShort(tracker.currentPace))
-                        .font(.system(size: 30, weight: .heavy))
-                        .monospacedDigit()
-                        .foregroundStyle(paceColor)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(paceHint)
-                        .font(.system(size: 14, weight: .heavy))
-                        .foregroundStyle(paceColor)
-                    if let r = tracker.targetRange, !tracker.engine.isFreeRun {
-                        Text(tracker.currentStepIsEasy ? "rustig, trager dan \(TimeText.clock(r.fast))" : "doel \(TimeText.range(r))")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Theme.secondary)
-                    }
-                }
-            }
         }
     }
 
@@ -240,6 +453,44 @@ struct RunScreen: View {
         }
     }
 
+    /// Vergrendeld: tikken doet niets, 1 seconde vasthouden ontgrendelt.
+    private var unlockControl: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Circle().fill(Theme.sunken)
+                Circle().strokeBorder(Theme.track, lineWidth: 4)
+                Circle()
+                    .trim(from: 0, to: holding ? 1 : 0)
+                    .stroke(Theme.text, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .padding(2)
+                    .animation(holding ? .linear(duration: 1) : .easeOut(duration: 0.2), value: holding)
+                Image(systemName: "lock.fill").font(.system(size: 24, weight: .bold))
+            }
+            .frame(width: 84, height: 84)
+            .contentShape(Circle())
+            .onLongPressGesture(minimumDuration: 1) {
+                withAnimation(.snappy) { locked = false }
+                holding = false
+            } onPressingChanged: { pressing in
+                holding = pressing
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Scherm ontgrendelen")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { locked = false }
+
+            Text("Houd 1 seconde vast om te ontgrendelen")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Theme.secondary)
+            Text("Pauze en blok overslaan kan ook via het vergrendelscherm.")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Theme.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 110)
+    }
+
     private var gpsBadge: some View {
         let acc = tracker.gpsAccuracy
         let good = acc.map { $0 >= 0 && $0 <= 20 } ?? false
@@ -247,6 +498,275 @@ struct RunScreen: View {
                      systemImage: good ? "location.fill" : "location.slash")
             .font(.system(size: 12, weight: .semibold))
             .foregroundStyle(good ? Theme.good : Theme.warn)
+    }
+}
+
+// MARK: - Onderdelen van het loopscherm
+
+/// Eén cijfer in het raster onder de tempokaart.
+struct GridStat: Identifiable {
+    let label: String
+    let value: String
+    var id: String { label }
+
+    init(_ label: String, _ value: String) {
+        self.label = label
+        self.value = value
+    }
+}
+
+/// Overzicht van de hele workout: één stukje per blok, breedte naar duur.
+struct OverviewStrip: View {
+    let segments: [RunTracker.Segment]
+    let title: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { geo in
+                let total = segments.reduce(0.0) { $0 + $1.weight }
+                let gap: CGFloat = 3
+                let usable = max(0, geo.size.width - gap * CGFloat(max(0, segments.count - 1)))
+                HStack(spacing: gap) {
+                    ForEach(segments) { s in
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(s.done || s.current ? Color(hex: s.hex) : Theme.track)
+                            .opacity(s.done ? 0.35 : 1)
+                            .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(Theme.text, lineWidth: s.current ? 2 : 0))
+                            .frame(width: max(3, usable * CGFloat(s.weight / max(total, 1))))
+                    }
+                }
+            }
+            .frame(height: 10)
+            HStack {
+                Text("Start")
+                Spacer()
+                Text(title)
+                Spacer()
+                Text("Einde")
+            }
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(Theme.tertiary)
+            .lineLimit(1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Overzicht: blok \((segments.firstIndex { $0.current } ?? 0) + 1) van \(segments.count)")
+    }
+}
+
+/// Tempometer: doelzone als groene band, streepje = je tempo nu. Links trager, rechts sneller.
+struct PaceMeter: View {
+    let pace: Double?
+    let range: PaceRange
+    let easy: Bool
+
+    var body: some View {
+        let width = max(10, range.slow - range.fast)
+        let slowEdge = range.slow + width
+        let fastEdge = range.fast - width
+        let span = slowEdge - fastEdge
+        let pos: (Double) -> Double = { p in min(1, max(0, (slowEdge - p) / span)) }
+        let bandStart = pos(range.slow)
+        let bandEnd = easy ? 1 : pos(range.fast)
+        let marker = pace.map(pos)
+
+        VStack(spacing: 5) {
+            GeometryReader { geo in
+                let w = geo.size.width
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.track).frame(height: 6)
+                    Capsule().fill(Theme.good.opacity(0.85))
+                        .frame(width: max(6, w * (bandEnd - bandStart)), height: 10)
+                        .offset(x: w * bandStart)
+                    if let marker {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Theme.text)
+                            .frame(width: 4, height: 20)
+                            .overlay(RoundedRectangle(cornerRadius: 2).stroke(Theme.card, lineWidth: 2))
+                            .offset(x: w * marker - 2)
+                            .animation(.easeOut(duration: 0.4), value: marker)
+                    }
+                }
+                .frame(height: 20)
+            }
+            .frame(height: 20)
+            HStack {
+                Text("trager")
+                Spacer()
+                Text(easy ? "rustig" : "\(TimeText.clock(range.slow)) – \(TimeText.clock(range.fast))")
+                    .foregroundStyle(Theme.secondary)
+                Spacer()
+                Text("sneller")
+            }
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(Theme.tertiary)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(pace == nil ? "Tempo nog onbekend" : "Tempometer")
+    }
+}
+
+/// Tijdrit: voor of achter op schema.
+struct ScheduleCard: View {
+    let offset: TimeInterval
+    let goal: TimeInterval
+    let projected: TimeInterval
+
+    var body: some View {
+        let ahead = offset <= 0
+        let secs = Int(abs(offset).rounded())
+        let color = abs(offset) < 3 ? Theme.good : (ahead ? Theme.good : Theme.warn)
+        let fraction = min(1, abs(offset) / 60)
+
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        SectionLabel("Schema")
+                        Text((ahead ? "−" : "+") + Format.clock(abs(offset)))
+                            .font(.system(size: 34, weight: .heavy))
+                            .monospacedDigit()
+                            .foregroundStyle(color)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(secs < 3 ? "Op schema" : "\(secs) s \(ahead ? "voor" : "achter")")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(color)
+                        Text("doel \(TimeText.clock(goal)) · eindtijd nu \(TimeText.clock(projected))")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                }
+                GeometryReader { geo in
+                    let half = geo.size.width / 2
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Theme.track).frame(height: 6)
+                        Rectangle().fill(color)
+                            .frame(width: half * fraction, height: 6)
+                            .offset(x: ahead ? half : half - half * fraction)
+                        Rectangle().fill(Theme.tertiary).frame(width: 2, height: 14).offset(x: half - 1)
+                    }
+                    .frame(height: 14)
+                }
+                .frame(height: 14)
+                HStack {
+                    Text("achter"); Spacer(); Text("op schema").foregroundStyle(Theme.secondary); Spacer(); Text("voor")
+                }
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Theme.tertiary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Kilometers tot nu toe, met het lopende stuk gestreept.
+struct LiveSplitsCard: View {
+    let splits: [Split]
+    let current: (number: Int, distance: Double, pace: Double?)
+
+    var body: some View {
+        let paces = splits.compactMap(\.pace) + (current.pace.map { [$0] } ?? [])
+        let lo = paces.min() ?? 0
+        let hi = paces.max() ?? 0
+        let fastest = splits.compactMap(\.pace).min()
+
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionLabel("Per kilometer")
+                if splits.isEmpty && current.distance < 50 {
+                    Text("Je eerste kilometer verschijnt hier.")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.secondary)
+                }
+                ForEach(Array(splits.enumerated()), id: \.offset) { i, s in
+                    let isFastest = s.pace != nil && s.pace == fastest && splits.count > 1
+                    row("\(i + 1)", s.pace, lo: lo, hi: hi, color: isFastest ? Theme.accent : Theme.muted, live: false)
+                }
+                if current.distance >= 50 {
+                    row("\(current.number)", current.pace, lo: lo, hi: hi, color: Theme.outline, live: true)
+                    Text("Km \(current.number) loopt nog: \(Fmt.km2(current.distance)) tot nu toe.")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Theme.tertiary)
+                }
+            }
+        }
+    }
+
+    private func row(_ label: String, _ pace: Double?, lo: Double, hi: Double, color: Color, live: Bool) -> some View {
+        let fraction: Double = {
+            guard let pace else { return 0 }
+            guard hi - lo > 1 else { return 1 }
+            return 0.35 + 0.65 * (hi - pace) / (hi - lo)
+        }()
+        return HStack(spacing: 10) {
+            Text(label)
+                .font(.system(size: 13, weight: .heavy))
+                .foregroundStyle(color == Theme.accent ? Theme.accent : Theme.secondary)
+                .frame(width: 30, alignment: .leading)
+            Bar(fraction: fraction, color: color, height: 8)
+                .opacity(live ? 0.7 : 1)
+            Text(pace.map { TimeText.clock($0) } ?? "–")
+                .font(.system(size: 15, weight: .heavy))
+                .monospacedDigit()
+                .foregroundStyle(live ? Theme.secondary : (color == Theme.accent ? Theme.accent : Theme.text))
+                .frame(width: 44, alignment: .trailing)
+        }
+    }
+}
+
+/// Snelle blokken tot nu toe tegenover het doel, met het lopende blok onderaan.
+struct LiveBlocksCard: View {
+    let blocks: [BlockResult]
+    let currentPace: Double?
+    let currentDistance: Double
+    let range: PaceRange?
+
+    var body: some View {
+        Card(padding: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    SectionLabel("Snelle blokken")
+                    Spacer()
+                    if let r = range ?? blocks.last.map({ PaceRange(fast: $0.targetPace - 5, slow: $0.targetPace + 5) }) {
+                        SectionLabel("Doel \(TimeText.range(r))")
+                    }
+                }
+                ForEach(Array(blocks.enumerated()), id: \.offset) { i, b in
+                    blockRow("\(i + 1)", detail: "\(Fmt.km2(b.distance)) · \(TimeText.clock(b.duration))",
+                             pace: b.pace, deviation: b.deviation)
+                }
+                if let currentPace, let range {
+                    blockRow("\(blocks.count + 1)", detail: "bezig · \(Int(currentDistance.rounded())) m",
+                             pace: currentPace, deviation: range.deviation(of: currentPace))
+                }
+            }
+        }
+    }
+
+    private func blockRow(_ n: String, detail: String, pace: Double?, deviation: Double?) -> some View {
+        let dev = deviation ?? 0
+        let within = abs(dev) <= 5
+        return HStack(spacing: 10) {
+            Text(n)
+                .font(.system(size: 13, weight: .heavy))
+                .foregroundStyle(Theme.secondary)
+                .frame(width: 30, alignment: .leading)
+            Text(detail)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.secondary)
+                .lineLimit(1)
+            Spacer()
+            Text(pace.map { TimeText.clock($0) } ?? "–")
+                .font(.system(size: 15, weight: .heavy))
+                .monospacedDigit()
+            Text(deviation == nil ? "" : (within ? "binnen" : "\(Int(abs(dev).rounded())) s \(dev < 0 ? "snel" : "traag")"))
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(within ? Theme.good : Theme.warn)
+                .frame(width: 62, alignment: .trailing)
+        }
     }
 }
 
@@ -392,65 +912,15 @@ struct RunSummaryView: View {
                 ForEach(messages) { CoachMessageCard(message: $0) }
 
                 if run.route.count > 1 {
-                    Map(initialPosition: .automatic) {
-                        MapPolyline(coordinates: zip(run.route.latitudes, run.route.longitudes)
-                            .map { CLLocationCoordinate2D(latitude: $0, longitude: $1) })
-                            .stroke(Theme.accent, lineWidth: 4)
-                    }
-                    .mapStyle(.standard(elevation: .flat, emphasis: .muted, pointsOfInterest: .excludingAll))
-                    .frame(height: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
-                    .allowsHitTesting(false)
+                    RunRouteMap(route: run.route)
                 }
 
-                Card(padding: 16) {
-                    VStack(spacing: 14) {
-                        HStack {
-                            StatBlock(label: "Afstand", value: Fmt.km2(run.distance), size: 19)
-                            StatBlock(label: "Tijd", value: TimeText.clock(run.duration), size: 19)
-                            StatBlock(label: "Gem. tempo", value: run.averagePace.map { TimeText.clock($0) } ?? "–", size: 19)
-                        }
-                        HStack {
-                            StatBlock(label: "Kadans", value: run.cadence.map { "\(Int($0.rounded())) spm" } ?? "–", size: 19)
-                            StatBlock(label: "Zwaarte", value: run.rpe.map { "\($0)/10" } ?? "–", size: 19)
-                            StatBlock(label: "Pijn", value: run.pain ? "Ja" : "Nee", size: 19)
-                        }
-                    }
-                }
+                RunStatsGrid(run: run)
 
                 let work = run.blocks.filter { $0.kind == .work }
-                if !work.isEmpty {
-                    Card(padding: 16) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            SectionLabel("Snelle blokken tegenover doel")
-                            ForEach(Array(work.enumerated()), id: \.offset) { i, b in
-                                BlockDeviationRow(index: i + 1, block: b)
-                            }
-                            Text("Links = sneller, rechts = trager. Groen = binnen 5 s van je doel.")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.tertiary)
-                        }
-                    }
-                }
+                if !work.isEmpty { WorkBlocksCard(blocks: work) }
 
-                if !run.splits.isEmpty {
-                    Card(padding: 16) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            SectionLabel("Tempo per kilometer")
-                            ForEach(Array(run.splits.enumerated()), id: \.offset) { i, s in
-                                HStack {
-                                    Text(s.isFullKm ? "Km \(i + 1)" : "Laatste \(Int(s.distance.rounded())) m")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(Theme.secondary)
-                                    Spacer()
-                                    Text(s.pace.map { TimeText.pace($0) } ?? "–")
-                                        .font(.system(size: 14, weight: .heavy))
-                                        .monospacedDigit()
-                                }
-                            }
-                        }
-                    }
-                }
+                if !run.splits.isEmpty { SplitsCard(splits: run.splits) }
 
                 Button("Klaar", action: onDone)
                     .buttonStyle(PrimaryButtonStyle(height: 52))

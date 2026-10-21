@@ -59,9 +59,25 @@ final class AppModel: ObservableObject {
         }
         refreshPlan()
         refreshRecords()
+        catchUp()
     }
 
     // MARK: - Plan
+
+    /// Gemiste trainingen noteren en afgelopen weken afsluiten. Bij elke start en elke terugkeer naar de app;
+    /// de coach verwerkt elke dag maar één keer.
+    func catchUp() {
+        guard let coach, let plan else { return }
+        let until: PlanDay
+        switch moment() {
+        case .running(let d): until = d
+        case .finished: until = PlanDay(index: plan.weeks.count * 7)
+        default: return
+        }
+        guard (coach.state.processedThrough ?? -1) < until.index - 1 else { return }
+        let events = mutateCoach { $0.catchUp(until: until) } ?? []
+        push(events)
+    }
 
     func createPlan(_ input: PlanInput) {
         coach = Coach(input: input)
@@ -186,6 +202,17 @@ final class AppModel: ObservableObject {
         messages.removeAll { $0.id == id }
     }
 
+    /// Niveau zelf aanpassen (Plan of niveautest), vanaf de huidige week.
+    func setLevel(_ vdot: Double) {
+        let week: Int
+        switch moment() {
+        case .running(let d): week = d.week
+        case .finished: week = max(0, (plan?.weeks.count ?? 1) - 1)
+        default: week = 0
+        }
+        mutateCoach { $0.setLevel(vdot, fromWeek: week) }
+    }
+
     private func push(_ events: [CoachEvent]) {
         messages.append(contentsOf: events.map { CoachMessage(event: $0) })
     }
@@ -240,6 +267,48 @@ final class AppModel: ObservableObject {
             let events = mutateCoach { $0.record(result) } ?? []
             push(events)
         }
+    }
+
+    /// Geplande training van dezelfde dag waaraan een vrije loop achteraf gekoppeld kan worden.
+    /// Ook als die dag al als gemist genoteerd werd en de training daardoor verschoof.
+    func linkCandidate(for summary: RunSummary) -> (day: PlanDay, workout: PlannedWorkout)? {
+        guard summary.planDay == nil, summary.source != .manual, let coach,
+              let day = planDay(for: summary.date), run(for: day) == nil,
+              !coach.state.results.contains(where: { $0.when == day && $0.status != .skipped }) else { return nil }
+        if let w = workout(at: day) { return (day, w) }
+        let skipped = coach.state.results.contains { $0.when == day && $0.status == .skipped }
+        guard skipped, let target = coach.state.adjustment(forWeek: day.week).moves[day.day],
+              var moved = workout(at: PlanDay(week: day.week, day: target)) else { return nil }
+        moved.day = day.day
+        return (day, moved)
+    }
+
+    /// Koppelt een vrije loop aan de geplande training van die dag; de coach telt hem dan mee.
+    /// Geeft de id's van nieuwe meldingen terug.
+    @discardableResult
+    func linkRun(id: UUID) -> [UUID] {
+        guard let store, let summary = runs.first(where: { $0.id == id }),
+              let target = linkCandidate(for: summary), var run = loadRun(id: id) else { return [] }
+        run.planDay = target.day
+        run.workout = target.workout
+        do {
+            try store.save(run)
+            runs = try store.summaries()
+        } catch {
+            errorText = "Koppelen mislukt: \(error.localizedDescription)"
+            return []
+        }
+        refreshRecords()
+        guard let result = run.coachResult else { return [] }
+        let events = mutateCoach { $0.recordLinked(result) } ?? []
+        let new = events.map { CoachMessage(event: $0) }
+        messages.append(contentsOf: new)
+        return new.map(\.id)
+    }
+
+    /// Volledige loop (route, splits, blokken) van schijf.
+    func loadRun(id: UUID) -> CompletedRun? {
+        try? store?.loadRun(id: id)
     }
 
     func deleteRun(id: UUID) {

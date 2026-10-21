@@ -21,8 +21,8 @@ struct OnboardingAnswers {
     var longRunDay: Weekday = .sunday
     var durationMode: DurationMode = .weeks
     var weeks = 12
-    var raceDate: Date = PlanCalendar.default.date(byAdding: .day, value: 7 * 12 + 6,
-                                                    to: PlanCalendar.nextMonday(onOrAfter: Date())) ?? Date()
+    var raceDate: Date = PlanCalendar.default.date(byAdding: .day, value: 7 * 11 + 6,
+                                                    to: PlanCalendar.monday(of: Date())) ?? Date()
 
     var performanceDistance: Double {
         levelMode == .recent ? recentDistance : Double(cooperMeters)
@@ -34,7 +34,15 @@ struct OnboardingAnswers {
 
     var vdot: Double? { Vdot.from(distance: performanceDistance, time: performanceTime) }
 
-    var startMonday: Date { PlanCalendar.nextMonday(onOrAfter: Date()) }
+    /// Maandag van week 1: deze week, of volgende week als er deze week geen loopdag meer over is.
+    var startMonday: Date { PlanCalendar.planStart(for: Date(), runDays: runDays.sorted()) }
+
+    /// Datum van de eerste training.
+    var firstTraining: Date {
+        let from = PlanCalendar.firstPlanDay(for: Date(), runDays: runDays.sorted())
+        let day = runDays.sorted().first(where: { $0 >= from }) ?? from
+        return PlanCalendar.default.date(byAdding: .day, value: day.rawValue, to: startMonday) ?? startMonday
+    }
 
     var planWeeks: Int {
         switch durationMode {
@@ -422,7 +430,7 @@ struct OnboardingView: View {
                     .padding(8)
                     .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.radius, style: .continuous))
             }
-            hint("\(answers.planWeeks) weken: start \(DateText.short(answers.startMonday)), tijdrit \(DateText.withYear(end)).")
+            hint("\(answers.planWeeks) weken: eerste training \(DateText.short(answers.firstTraining)), tijdrit \(DateText.withYear(end)).")
         }
     }
 
