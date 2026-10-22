@@ -132,6 +132,7 @@ Bestanden LoopCore:
 | `Sources/LoopCore/Coach.swift` | De coach: `record`, `accept`, `finishWeek`, `notFeeling`, `recovered`, extra loop, `moveWorkout` |
 | `Sources/LoopCore/CueText.swift` | Uitgesproken tijden, tempo's en afstanden ("4 minuten 50", "anderhalve kilometer") |
 | `Sources/LoopCore/WorkoutEngine.swift` | Engine voor het lopen: `EngineSettings`, `Cue`, `EngineStep`, `WorkoutEngine` (start, update, skipStep, stop, completedRun) |
+| `Sources/LoopCore/LivePace.swift` | Tempo "nu" op het loopscherm: Doppler-snelheid, 10 s vasthouden, dan pasteller; mediaan van 5 + glijdend gemiddelde (22 okt) |
 | `Sources/LoopCore/EngineSimulator.swift` | Gesimuleerde loper voor tests en cue-preview |
 | `Sources/CuePreview/main.swift` | Cue-preview: wat de stem zegt bij 7 gesimuleerde loopjes, als Markdown in de Summary |
 | `Sources/PlanPreview/main.swift` | Preview: zones, volledig 12-weken-plan, voorbeeld extra loop, vergelijking 4 dagen, coach-scenario's A-E |
@@ -248,7 +249,7 @@ Bestanden app (`LoopApp/`):
 - `Stats`: weekkilometers gepland vs. gelopen (op datum, dus ook vrije loopjes), PR's uit opeenvolgende volle km-splits (manuele loopjes enkel voor langste loop).
 - `Coach.moveWorkout`: verslepen binnen de week, resultaat `moved(warning:)`, `dayTaken`, `nothingToMove`, `alreadyDone`.
 
-## Status (18 oktober 2026)
+## Status (18 oktober 2026, zie ook de versies hieronder)
 - ✅ **LoopApp staat op de iPhone en opent (18 okt).** De route GitHub Actions → `LoopApp.ipa` → iloader → iPhone werkt.
 - 🔄 Naam Runner en nieuw icoon (18 okt): klaar in de repo-bestanden, nog te pushen en te controleren op de iPhone (build 0.3).
 - ✅ LoopCore (plan-brein, coach, opslag) volledig getest in GitHub Actions.
@@ -274,7 +275,7 @@ Bestanden app (`LoopApp/`):
 
 **Gratis alternatieven bekeken (16 okt), voor als iloader ooit niet meer werkt:** Xcode op de Mac van Louis' vriendin (Personal Team, gratis, geen last van anisette) zou werken, maar valt af: te weinig schijfruimte (Xcode vraagt 30 à 40 GB). Valt ook af: PWA (geen GPS met scherm uit), macOS-VM op Windows, EU-route met alternatieve appwinkels (vraagt betaald account), TrollStore (enkel oude iOS), eigen anisette-server (veel werk, onzeker, risico op blokkade). Betaald account: nee.
 
-## Feedbackronde na de eerste loop (20 okt, versie 0.6, nog niet gepusht)
+## Feedbackronde na de eerste loop (20 okt, versie 0.6)
 Eerste loop: vrij lopen, 4,02 km in 18:14 (4:32 per km), bewust all-out over 4 km (5 km had Louis niet volgehouden).
 - **Niveau 40 (keuze van Louis).** Formule geeft 42,4, maar een korte all-out loop test vooral snelheid. Toepassen via de nieuwe niveautest of via Plan › Niveau aanpassen.
 - **Niveautest uit een gelopen loop** (`LevelTest.swift`): vanaf 5 km telt het gemeten niveau volledig, korter telt de helft van het verschil met het huidige niveau, naar beneden afgerond op 0,5 (voor deze loop: 40,0). `Coach.setLevel(_:fromWeek:)` geldt vanaf de huidige week en blokkeert 2 weken nieuwe tempovoorstellen. Scherm `Plan/LevelSheet.swift` (stappen van 0,5, vergelijking nu → nieuw van 5 km, 10 km, rustig, tempo, interval). Tests `LevelTestTests`.
@@ -299,11 +300,23 @@ Bevat: plan start in de huidige week, detail per loop, loop verwijderen, korte l
 - **Diagnose verwijderd**: `LoopApp/Debug/` is weg. `Speaker` staat nu in `Run/Speaker.swift`, `Format` in `Run/Format.swift`. Proof of concept is daarmee afgesloten.
 - Versie 0.7 (build 7).
 
+## Versie 0.8 (22 okt, `Runner-0.8.zip`, na de lange loop van donderdag 22 okt)
+Feedback van Louis na zijn lange loop:
+1. **Voortgang in het huidige blok** in de overzichtsbalk bovenaan het loopscherm. Voorheen had het huidige blok enkel een witte rand; bij een lange loop (één blok) zag je dus geen voortgang in de balk.
+2. **Tempo "nu" schommelde** tussen 7:00 en 4:55 bij een gelijk tempo, vermoedelijk door GPS dat wegviel en terug inpikte.
+
+Oorzaak van 2: het tempo was de afgelegde GPS-afstand over de laatste 30 s. Bij zwak signaal verspringen posities (de afstand wordt opgeblazen, dus te snel) of lopen ze achter en halen ze daarna in (eerst te traag, dan te snel). Simulatie in Python (`scratchpad`, niet in de repo): bij een echte 6:10 gaf de oude methode na zwak signaal tot 3:04.
+
+Gebouwd:
+- **`OverviewStrip`** (`Run/RunScreen.swift`): het huidige blok krijgt minstens 40% van de breedte (de rest schuift naar verhouding mee, animatie bij elke blokwissel), vult zich in de typekleur over een lichte versie van dezelfde kleur, en een wit staafje (3 × 20 pt) schuift mee. Voortgang op afstand of tijd, naargelang het blok (`engine.progress`). Gedane blokken gedimd, komende grijs. `RunTracker.Segment` kreeg `progress`. De aparte balk onder het grote getal op de cijferpagina is weg (dubbel); op de kaart- en kilometerpagina blijft hij.
+- **`LivePace`** (LoopCore, tests `LivePaceTests`, grenzen nagerekend met een Python-port): (1) Doppler-snelheid van de GPS (`CLLocation.speed`), los van de positie, enkel met `speedAccuracy` ≤ 1,5 m/s; (2) valt die weg, de laatste waarde 10 s vasthouden; (3) daarna het tempo van de pasteller (`CMPedometerData.currentPace`). Mediaan van de laatste 5 metingen (één uitschieter doet niets), dan een tijdsgewogen glijdend gemiddelde (± 5 s, 8 s bij minder nauwkeurige Doppler of pasteller). Stilstaan (trager dan 20:00/km) of 15 s zonder meting = "-:--". Reset bij start en na elke pauze. Een intervalwissel 6:10 → 4:50 staat na ± 10 s op het scherm (oude methode: ± 30 s). De tempo-cues (te snel/traag) gebruiken hetzelfde tempo, dus ook minder valse waarschuwingen.
+- **Tijd per meting** = moment van de GPS-meting, niet het moment van binnenkomen (op de achtergrond komen metingen in groepjes).
+- **Afstand bij zwak signaal**: bij een positie van ±15 m of slechter én een bruikbare Doppler-snelheid telt een stuk hooguit snelheid × tijd + 20%. Bij goed signaal verandert er niets.
+- `Format.rollingPace` verwijderd (niet meer gebruikt). Versie 0.8 (build 8).
+
+Nog te bekijken na een echte loop: of de afstand bij goed signaal ook beter van de Doppler-snelheid komt. Daarvoor zou de app per GPS-punt snelheid en nauwkeurigheid moeten bewaren (idee: optioneel GPS-logboek als CSV), zodat beide methodes op echte data te vergelijken zijn.
+
 ## Volgende stap
-000. Versie 0.6 (build 6, 20 okt): plan start in de huidige week. Pushen, LoopCore-tests en app-build in Actions controleren, installeren via iloader. Onboarding toont nu "eerste training" in plaats van de startmaandag.
-00. Dinsdag 20 okt: eerste loop met het loopscherm gedaan als **Vrij lopen** (het plan begon toen nog pas op 26 okt). Die loop is niet gekoppeld aan de plantraining van dinsdag, dus die staat na de update als gemist in de kalender. Daarna feedback op loopscherm, Na de loop en routekaart. Dan: gemiste sessies en `finishWeek`, punten verslepen in de planner. Idee: een vrije loop achteraf koppelen aan de plantraining van die dag.
-0b. Live Activity-proef testen (Diagnose › intervaltest, thuis). Gaat het goed: loopscherm (stap 2) met Live Activity en de routekaart bouwen, zodat Louis ze dinsdag 20 okt kan testen tijdens de eerste plantraining.
-0. Naam en icoon pushen, nieuwe `LoopApp.ipa` installeren via iloader (Import IPA over de bestaande app heen, gegevens blijven), icoon en naam controleren.
-1. Onboarding doorlopen met echte gegevens en de schermen van stap 1 op het toestel bekijken (opmerkingen en screenshots noteren).
-2. **Diagnose testen** (Instellingen › Diagnose): intervaltest en minstens 2 km vrij lopen, telkens met muziek aan en scherm vergrendeld. Daarna screenshots van diagnose en logboek, plus hoe de cues klonken en of de muziek stiller ging.
-3. Na die test: `RunTracker`, loopscherm, kadans, Na de loop en gemiste sessies/`finishWeek`.
+1. **Versie 0.8 pushen**, LoopCore-tests (`LivePaceTests`) en app-build in Actions controleren, installeren via iloader. De app verloopt zaterdag 25 okt, dus best samen met die herinstallatie.
+2. Volgende loop: letten op de overzichtsbalk (staafje, verbreding bij intervallen) en of tempo "nu" rustig blijft, ook onder bomen of tussen hoge gebouwen.
+3. Openstaand: punten verslepen in de routeplanner, coach-meldingen bewaren tussen app-starts, meldingen (trainingsdag, herinstallatie na 7 dagen), widget, Apple Health, loopband-modus.

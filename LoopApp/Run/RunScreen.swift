@@ -180,10 +180,6 @@ struct RunScreen: View {
                             .lineLimit(1)
                     }
                 }
-                if !tracker.engine.isFreeRun {
-                    Bar(fraction: tracker.stepProgress, color: labelColor, height: 6)
-                        .padding(.top, 6)
-                }
                 if let next = tracker.nextText {
                     Text(next)
                         .font(.system(size: 14, weight: .semibold))
@@ -516,27 +512,45 @@ struct GridStat: Identifiable {
 }
 
 /// Overzicht van de hele workout: één stukje per blok, breedte naar duur.
+/// Het huidige blok krijgt minstens 40% van de breedte (anders zijn korte intervallen
+/// onleesbaar), vult zich in de typekleur en een wit staafje toont hoe ver je zit (22 okt).
 struct OverviewStrip: View {
     let segments: [RunTracker.Segment]
     let title: String
 
+    /// Aandeel van de breedte voor het huidige blok, minstens.
+    static let currentShare = 0.4
+    private let barHeight: CGFloat = 12
+    private let markerHeight: CGFloat = 20
+
+    /// Breedte per blok: naar duur, met het huidige blok opgerekt tot minstens 40%.
+    static func shares(_ segments: [RunTracker.Segment]) -> [Double] {
+        let total = segments.reduce(0.0) { $0 + $1.weight }
+        guard total > 0 else { return segments.map { _ in 0 } }
+        var shares = segments.map { $0.weight / total }
+        guard segments.count > 1, let i = segments.firstIndex(where: { $0.current }),
+              shares[i] < currentShare else { return shares }
+        let rest = 1 - shares[i]
+        let scale = rest > 0 ? (1 - currentShare) / rest : 0
+        for j in shares.indices { shares[j] = j == i ? currentShare : shares[j] * scale }
+        return shares
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             GeometryReader { geo in
-                let total = segments.reduce(0.0) { $0 + $1.weight }
                 let gap: CGFloat = 3
                 let usable = max(0, geo.size.width - gap * CGFloat(max(0, segments.count - 1)))
+                let shares = OverviewStrip.shares(segments)
                 HStack(spacing: gap) {
-                    ForEach(segments) { s in
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(s.done || s.current ? Color(hex: s.hex) : Theme.track)
-                            .opacity(s.done ? 0.35 : 1)
-                            .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(Theme.text, lineWidth: s.current ? 2 : 0))
-                            .frame(width: max(3, usable * CGFloat(s.weight / max(total, 1))))
+                    ForEach(Array(segments.enumerated()), id: \.element.id) { i, s in
+                        segmentView(s, width: max(4, usable * CGFloat(shares[i])))
                     }
                 }
+                .frame(height: geo.size.height)
+                .animation(.easeInOut(duration: 0.35), value: segments.firstIndex(where: { $0.current }))
             }
-            .frame(height: 10)
+            .frame(height: markerHeight)
             HStack {
                 Text("Start")
                 Spacer()
@@ -549,7 +563,37 @@ struct OverviewStrip: View {
             .lineLimit(1)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Overzicht: blok \((segments.firstIndex { $0.current } ?? 0) + 1) van \(segments.count)")
+        .accessibilityLabel(accessibilityText)
+    }
+
+    @ViewBuilder
+    private func segmentView(_ s: RunTracker.Segment, width: CGFloat) -> some View {
+        let color = Color(hex: s.hex)
+        if s.current {
+            let p = CGFloat(max(0, min(s.progress, 1)))
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 4).fill(color.opacity(0.28))
+                    .frame(width: width, height: barHeight)
+                RoundedRectangle(cornerRadius: 4).fill(color)
+                    .frame(width: width * p, height: barHeight)
+                Capsule().fill(Theme.text)
+                    .frame(width: 3, height: markerHeight)
+                    .offset(x: min(max(0, width * p - 1.5), max(0, width - 3)))
+            }
+            .frame(width: width, height: markerHeight, alignment: .leading)
+            .animation(.linear(duration: 1), value: s.progress)
+        } else {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(s.done ? color : Theme.track)
+                .opacity(s.done ? 0.35 : 1)
+                .frame(width: width, height: barHeight)
+        }
+    }
+
+    private var accessibilityText: String {
+        guard let i = segments.firstIndex(where: { $0.current }) else { return "Overzicht: workout klaar" }
+        let pct = Int((segments[i].progress * 100).rounded())
+        return "Overzicht: blok \(i + 1) van \(segments.count), \(pct) procent"
     }
 }
 

@@ -10,14 +10,6 @@ enum Format {
         return p <= 1200 ? p : nil
     }
 
-    /// Tempo over de laatste `window` seconden op basis van (tijd, totale afstand)-metingen.
-    static func rollingPace(samples: [(t: TimeInterval, d: Double)], now: TimeInterval, window: TimeInterval = 30) -> Double? {
-        guard let last = samples.last, let first = samples.first(where: { $0.t >= now - window }) else { return nil }
-        let dt = last.t - first.t
-        guard dt >= 10 else { return nil }
-        return pace(duration: dt, distance: last.d - first.d)
-    }
-
     static func clock(_ t: TimeInterval) -> String {
         let s = max(0, Int(t.rounded()))
         return String(format: "%ld:%02ld", s / 60, s % 60)

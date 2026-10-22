@@ -44,6 +44,8 @@ final class RunTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
     private var timer: Timer?
     private var lastLocation: CLLocation?
     private var samples: [(t: TimeInterval, d: Double)] = []
+    /// Tempo "nu": Doppler-snelheid, anders even vasthouden, anders de pasteller (22 okt, zie LoopCore).
+    private var livePace = LivePace()
     private var track = RouteTrack()
     private var steps: Int?
     private var activity: Activity<RunActivityAttributes>?
@@ -153,6 +155,8 @@ final class RunTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
         let hex: UInt32
         let done: Bool
         let current: Bool
+        /// Hoe ver dit blok gevorderd is (0 tot 1), op afstand of tijd naargelang het blok.
+        let progress: Double
     }
 
     /// Alle blokken van de workout, breedte naar geschatte duur.
@@ -163,8 +167,10 @@ final class RunTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
             case .time(let t): w = t
             case .distance(let m): w = m / 1000 * s.targetPace
             }
-            return Segment(id: i, weight: max(w, 1), hex: hex(for: s),
-                           done: i < engine.currentIndex || engine.isFinished, current: i == engine.currentIndex)
+            let done = i < engine.currentIndex || engine.isFinished
+            let current = i == engine.currentIndex && !engine.isFinished
+            return Segment(id: i, weight: max(w, 1), hex: hex(for: s), done: done, current: current,
+                           progress: done ? 1 : (current ? stepProgress : 0))
         }
     }
 
@@ -219,6 +225,7 @@ final class RunTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
         autoPauseAnchor = nil
         lastResumeElapsed = currentElapsed()
         lastLocation = nil   // stuk tijdens de pauze telt niet mee
+        livePace.reset()     // tempo opnieuw opbouwen na stilstaan
         announce("Verder.", signal: .hervat)
         update()
         updateActivity(force: true)
@@ -306,6 +313,7 @@ final class RunTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
         realStart = now
         phase = .running
         samples = [(t: 0, d: 0)]
+        livePace.reset()
         if let loc = lastLocation { record(loc, at: 0) }
         engine.start().forEach { handle($0) }
         startPedometer(from: now)
@@ -322,7 +330,7 @@ final class RunTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
         guard phase == .running, !paused else { return }
         let now = currentElapsed()
         elapsed = now
-        currentPace = Format.rollingPace(samples: samples, now: now)
+        currentPace = livePace.pace(at: now)
         let out = engine.update(elapsed: now, distance: distance, pace: currentPace)
         apply(out)
         if !out.finished {
@@ -476,8 +484,13 @@ final class RunTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
         pedometer.startUpdates(from: date) { [weak self] data, _ in
             guard let data else { return }
             DispatchQueue.main.async {
-                self?.steps = data.numberOfSteps.intValue
-                if let c = data.currentCadence?.doubleValue { self?.cadence = c * 60 }
+                guard let self else { return }
+                self.steps = data.numberOfSteps.intValue
+                if let c = data.currentCadence?.doubleValue { self.cadence = c * 60 }
+                // Tempo van de pasteller (seconden per meter): terugval als de GPS-snelheid wegvalt.
+                if self.phase == .running, !self.paused, let p = data.currentPace?.doubleValue, p > 0 {
+                    self.livePace.addPedometer(paceSecondsPerKm: p * 1000, at: self.currentElapsed())
+                }
             }
         }
     }
@@ -504,8 +517,16 @@ final class RunTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
     private func handle(_ loc: CLLocation) {
         guard phase != .finished else { return }
         gpsAccuracy = loc.horizontalAccuracy
+        let age = -loc.timestamp.timeIntervalSinceNow
+        // Tempo nu: de Doppler-snelheid, ook als de positie minder nauwkeurig is (LivePace kijkt
+        // zelf naar speedAccuracy). Tijd = moment van de meting, want op de achtergrond komen
+        // metingen soms in groepjes binnen.
+        if phase == .running, !paused, abs(age) < 10 {
+            livePace.addGPS(speed: loc.speed, speedAccuracy: loc.speedAccuracy,
+                            at: max(0, currentElapsed() - max(0, age)))
+        }
         guard loc.horizontalAccuracy >= 0, loc.horizontalAccuracy <= 30,
-              abs(loc.timestamp.timeIntervalSinceNow) < 10 else { return }
+              abs(age) < 10 else { return }
         guard phase == .running else {   // tijdens het aftellen enkel opwarmen
             lastLocation = loc
             return
@@ -516,9 +537,15 @@ final class RunTracker: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
 
         if let last = lastLocation {
-            let d = loc.distance(from: last)
+            var d = loc.distance(from: last)
             let dt = max(loc.timestamp.timeIntervalSince(last.timestamp), 0.5)
             guard d / dt < 12 else { return }   // sprongen sneller dan 43 km/u zijn GPS-ruis
+            // Zwak signaal (positie ±15 m of slechter): verspringende punten blazen de afstand op.
+            // Met een bruikbare Doppler-snelheid telt een stuk hooguit snelheid × tijd + 20%.
+            if loc.horizontalAccuracy > 15, dt <= 5,
+               LivePace.isUsable(speed: loc.speed, speedAccuracy: loc.speedAccuracy) {
+                d = min(d, loc.speed * dt * 1.2)
+            }
             distance += d
         }
         lastLocation = loc
