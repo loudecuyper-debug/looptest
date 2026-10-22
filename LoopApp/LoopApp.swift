@@ -69,7 +69,16 @@ struct RootView: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { model.catchUp() }
+            if phase == .active {
+                model.catchUp()
+                model.rescheduleReminders()   // venster van 14 dagen schuift mee
+            }
+        }
+        .task(id: model.coach != nil) {
+            // Toestemming voor meldingen vragen zodra er een plan is (iOS vraagt het maar één keer).
+            guard model.coach != nil, ReminderSettings.anyOn else { return }
+            await Reminders.requestIfNeeded()
+            model.rescheduleReminders()
         }
         .alert("Er liep iets mis", isPresented: Binding(present: $model.errorText)) {
             Button("OK", role: .cancel) {}

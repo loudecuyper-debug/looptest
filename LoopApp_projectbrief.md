@@ -314,9 +314,18 @@ Gebouwd:
 - **Afstand bij zwak signaal**: bij een positie van ±15 m of slechter én een bruikbare Doppler-snelheid telt een stuk hooguit snelheid × tijd + 20%. Bij goed signaal verandert er niets.
 - `Format.rollingPace` verwijderd (niet meer gebruikt). Versie 0.8 (build 8).
 
+**Meldingen** (toegevoegd aan 0.8 op vraag van Louis, `Notifications/Reminders.swift`): lokale meldingen, geen server of betaald account nodig.
+- **Op de trainingsdag** (standaard aan, 8:00, tijd te kiezen): titel "Vandaag: <workout>", tekst met geschatte afstand, duur en de inhoud (`WorkoutText.describe`). Geen melding als die training al gelopen is, en geen enkele trainingsmelding zolang "ziek" loopt.
+- **De avond ervoor** (standaard uit, 20:00): "Morgen: <workout>".
+- **App opnieuw installeren** (standaard aan): de app leest de vervaldatum uit het meegeleverde profiel (`embedded.mobileprovision`, `ExpirationDate`) en meldt de avond ervoor om 19:00 en die dag om 9:00 (of 2 uur vooraf als hij vroeger verloopt). Instellingen toont wanneer de huidige installatie verloopt.
+- Alles wordt telkens opnieuw gepland (alle oude meldingen eerst weg) na elke planwijziging (`refreshPlan`), na het verwijderen van een loop, bij elke terugkeer naar de app en bij een andere keuze in Instellingen. Venster van 14 dagen, hooguit 30 meldingen (iOS-limiet 64).
+- Toestemming wordt gevraagd zodra er een plan is (of bij het aanzetten van een melding). Staat het uit in iOS, dan toont Instellingen een waarschuwing met een knop naar de iOS-instellingen.
+- Kaart "Meldingen" in Instellingen, tussen Lopen en Backup. Geen extra sleutel nodig in `Info.plist`.
+
 Nog te bekijken na een echte loop: of de afstand bij goed signaal ook beter van de Doppler-snelheid komt. Daarvoor zou de app per GPS-punt snelheid en nauwkeurigheid moeten bewaren (idee: optioneel GPS-logboek als CSV), zodat beide methodes op echte data te vergelijken zijn.
 
 ## Volgende stap
 1. **Versie 0.8 pushen**, LoopCore-tests (`LivePaceTests`) en app-build in Actions controleren, installeren via iloader. De app verloopt zaterdag 25 okt, dus best samen met die herinstallatie.
-2. Volgende loop: letten op de overzichtsbalk (staafje, verbreding bij intervallen) en of tempo "nu" rustig blijft, ook onder bomen of tussen hoge gebouwen.
-3. Openstaand: punten verslepen in de routeplanner, coach-meldingen bewaren tussen app-starts, meldingen (trainingsdag, herinstallatie na 7 dagen), widget, Apple Health, loopband-modus.
+2. Na het installeren: toestemming voor meldingen geven, in Instellingen nakijken of de vervaldatum klopt (en of die ochtendmelding op de volgende trainingsdag binnenkomt).
+3. Volgende loop: letten op de overzichtsbalk (staafje, verbreding bij intervallen) en of tempo "nu" rustig blijft, ook onder bomen of tussen hoge gebouwen.
+4. Openstaand: punten verslepen in de routeplanner, coach-meldingen bewaren tussen app-starts, widget, Apple Health, loopband-modus.

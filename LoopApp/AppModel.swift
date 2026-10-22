@@ -238,6 +238,7 @@ final class AppModel: ObservableObject {
 
     private func refreshPlan() {
         plan = coach?.plan(calendar: calendar)
+        rescheduleReminders()
     }
 
     // MARK: - Loopjes
@@ -320,6 +321,7 @@ final class AppModel: ObservableObject {
             errorText = "Verwijderen mislukt: \(error.localizedDescription)"
         }
         refreshRecords()
+        rescheduleReminders()   // een verwijderde plantraining krijgt opnieuw een melding
     }
 
     /// Bewaart een gelopen loop en geeft hem aan de coach.

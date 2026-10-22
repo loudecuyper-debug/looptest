@@ -1,4 +1,6 @@
 import SwiftUI
+import UIKit
+import UserNotifications
 import UniformTypeIdentifiers
 import LoopCore
 
@@ -55,6 +57,13 @@ struct SettingsView: View {
     @AppStorage(CueSettings.remaining) private var cueRemaining = false
     @AppStorage(CueSettings.duck) private var duckMusic = true
     @AppStorage(CueSettings.autoPause) private var autoPause = true
+    @AppStorage(ReminderSettings.training) private var remindTraining = true
+    @AppStorage(ReminderSettings.time) private var remindTime = ReminderSettings.defaultTime
+    @AppStorage(ReminderSettings.evening) private var remindEvening = false
+    @AppStorage(ReminderSettings.expiry) private var remindExpiry = true
+    @State private var notificationStatus: UNAuthorizationStatus?
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.openURL) private var openURL
 
     @State private var speaker: Speaker?
     @State private var exportDocument: BackupDocument?
@@ -71,6 +80,7 @@ struct SettingsView: View {
                     if cueMode != CueMode.signals.rawValue { voiceCard }
                     cuesCard
                     runCard
+                    remindersCard
                     backupCard
                     Text("Runner \(appVersion) · alles lokaal, geen account")
                         .font(.system(size: 12, weight: .semibold))
@@ -82,6 +92,14 @@ struct SettingsView: View {
                 .padding(.vertical, 8)
             }
             .screenTitle("Instellingen")
+            .task { notificationStatus = await Reminders.status() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { Task { notificationStatus = await Reminders.status() } }
+            }
+            .onChange(of: remindTraining) { _, on in remindersChanged(turnedOn: on) }
+            .onChange(of: remindEvening) { _, on in remindersChanged(turnedOn: on) }
+            .onChange(of: remindExpiry) { _, on in remindersChanged(turnedOn: on) }
+            .onChange(of: remindTime) { _, _ in remindersChanged(turnedOn: false) }
             .fileExporter(isPresented: Binding(present: $exportDocument), document: exportDocument,
                           contentType: .json, defaultFilename: backupName) { result in
                 switch result {
@@ -245,6 +263,70 @@ struct SettingsView: View {
                 SectionLabel("Lopen", color: Theme.muted).padding(.bottom, 10)
                 toggleRow("Automatisch pauzeren", "Bij stilstaan, bv. aan een verkeerslicht. Niet tijdens snelle blokken en herstel, daar loopt de klok door.", $autoPause)
             }
+        }
+    }
+
+    // MARK: - Meldingen
+
+    private var remindersCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 0) {
+                SectionLabel("Meldingen", color: Theme.muted).padding(.bottom, 10)
+                toggleRow("Op de trainingsdag", "Om \(ReminderSettings.clock(remindTime)), met afstand, duur en inhoud. Niet als je al gelopen hebt.", $remindTraining)
+                if remindTraining {
+                    HStack {
+                        Text("Tijdstip").font(.system(size: 15, weight: .bold))
+                        Spacer()
+                        DatePicker("Tijdstip", selection: reminderTimeBinding, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                            .environment(\.locale, Locale(identifier: "nl_BE"))
+                    }
+                    .frame(minHeight: 50)
+                    .overlay(alignment: .top) { divider }
+                }
+                toggleRow("De avond ervoor", "Om \(ReminderSettings.clock(ReminderSettings.eveningTime))", $remindEvening)
+                toggleRow("App opnieuw installeren", expiryText, $remindExpiry)
+
+                if notificationStatus == .denied {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Meldingen staan uit voor Runner in iOS. Zonder toestemming komt er niets binnen.")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.warn)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Meldingen aanzetten in iOS") {
+                            if let url = URL(string: UIApplication.openNotificationSettingsURLString) { openURL(url) }
+                        }
+                        .buttonStyle(SecondaryButtonStyle(height: 44))
+                    }
+                    .padding(.top, 12)
+                    .overlay(alignment: .top) { divider }
+                }
+            }
+        }
+    }
+
+    private var expiryText: String {
+        guard let expiry = Reminders.expiryDate else {
+            return "De avond voor de app verloopt en die ochtend (vervaldatum niet gevonden in deze installatie)."
+        }
+        return "Deze installatie verloopt \(DateText.short(expiry)) om \(DateText.time(expiry)). Melding de avond ervoor en die ochtend."
+    }
+
+    private var reminderTimeBinding: Binding<Date> {
+        Binding {
+            Calendar.current.date(bySettingHour: remindTime / 60, minute: remindTime % 60, second: 0, of: Date()) ?? Date()
+        } set: { date in
+            let c = Calendar.current.dateComponents([.hour, .minute], from: date)
+            remindTime = (c.hour ?? 8) * 60 + (c.minute ?? 0)
+        }
+    }
+
+    /// Toestemming vragen als er een melding aangezet wordt, daarna alles opnieuw plannen.
+    private func remindersChanged(turnedOn: Bool) {
+        Task {
+            if turnedOn { await Reminders.requestIfNeeded() }
+            notificationStatus = await Reminders.status()
+            model.rescheduleReminders()
         }
     }
 
