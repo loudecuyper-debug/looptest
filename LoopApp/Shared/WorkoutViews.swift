@@ -102,7 +102,7 @@ struct WorkoutDetailView: View {
         let zones = week.zones
         let status = model.status(of: day)
         let date = model.date(for: day) ?? Date()
-        let free = ExtraRun.freeDays(in: week)
+        let free = model.moveTargets(for: day)
         let canMove = status == .today || status == .upcoming
 
         return ScrollView {
@@ -143,30 +143,28 @@ struct WorkoutDetailView: View {
                     }
                 }
 
-                if canMove {
-                    // Lopen kan enkel op de dag zelf, zodat de loop bij de juiste dag in het plan hoort.
-                    if status == .today, model.run(for: day) == nil {
-                        Button {
-                            runRequest = RunRequest(workout: workout, day: day, zones: zones)
-                        } label: {
-                            Label("Start workout", systemImage: "play.fill")
-                        }
-                        .buttonStyle(PrimaryButtonStyle(height: 52))
+                // Lopen kan enkel op de dag zelf, zodat de loop bij de juiste dag in het plan hoort.
+                if canMove, status == .today, model.run(for: day) == nil {
+                    Button {
+                        runRequest = RunRequest(workout: workout, day: day, zones: zones)
+                    } label: {
+                        Label("Start workout", systemImage: "play.fill")
                     }
+                    .buttonStyle(PrimaryButtonStyle(height: 52))
+                }
 
-                    if !free.isEmpty, model.run(for: day) == nil {
-                        Menu {
-                            ForEach(free, id: \.self) { d in
-                                Button(d.name.capitalized) { move(to: d) }
-                            }
-                        } label: {
-                            Label("Verplaatsen naar andere dag", systemImage: "arrow.left.arrow.right")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(Theme.text)
-                                .frame(maxWidth: .infinity, minHeight: 46)
-                                .background(Theme.sunken, in: Capsule())
-                                .overlay(Capsule().strokeBorder(Theme.outline, lineWidth: 1))
+                if !free.isEmpty {
+                    Menu {
+                        ForEach(free, id: \.self) { d in
+                            Button(d.name.capitalized) { move(to: d) }
                         }
+                    } label: {
+                        Label("Verplaatsen naar andere dag", systemImage: "arrow.left.arrow.right")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Theme.text)
+                            .frame(maxWidth: .infinity, minHeight: 46)
+                            .background(Theme.sunken, in: Capsule())
+                            .overlay(Capsule().strokeBorder(Theme.outline, lineWidth: 1))
                     }
                 }
 
@@ -204,6 +202,8 @@ struct WorkoutDetailView: View {
             notice = "Op die dag staat al een training."
         case .alreadyDone?:
             notice = "Deze training is al gelopen."
+        case .dayPassed?:
+            notice = "Die dag is al voorbij."
         case .nothingToMove?, nil:
             break
         }

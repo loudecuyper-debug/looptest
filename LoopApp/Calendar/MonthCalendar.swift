@@ -147,9 +147,8 @@ struct MonthCalendar: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            if let day, workout != nil, let week = model.week(day),
-               status == .today || status == .upcoming {
-                let free = ExtraRun.freeDays(in: week)
+            if let day, workout != nil {
+                let free = model.moveTargets(for: day)
                 if !free.isEmpty {
                     Menu("Verplaatsen naar") {
                         ForEach(free, id: \.self) { d in

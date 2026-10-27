@@ -249,7 +249,7 @@ Bestanden app (`LoopApp/`):
 - `Stats`: weekkilometers gepland vs. gelopen (op datum, dus ook vrije loopjes), PR's uit opeenvolgende volle km-splits (manuele loopjes enkel voor langste loop).
 - `Coach.moveWorkout`: verslepen binnen de week, resultaat `moved(warning:)`, `dayTaken`, `nothingToMove`, `alreadyDone`.
 
-## Status (18 oktober 2026, zie ook de versies hieronder)
+## Status (18 oktober 2026, zie ook de versies hieronder; laatste versie 0.9 op 27 okt)
 - ✅ **LoopApp staat op de iPhone en opent (18 okt).** De route GitHub Actions → `LoopApp.ipa` → iloader → iPhone werkt.
 - 🔄 Naam Runner en nieuw icoon (18 okt): klaar in de repo-bestanden, nog te pushen en te controleren op de iPhone (build 0.3).
 - ✅ LoopCore (plan-brein, coach, opslag) volledig getest in GitHub Actions.
@@ -324,8 +324,36 @@ Gebouwd:
 
 Nog te bekijken na een echte loop: of de afstand bij goed signaal ook beter van de Doppler-snelheid komt. Daarvoor zou de app per GPS-punt snelheid en nauwkeurigheid moeten bewaren (idee: optioneel GPS-logboek als CSV), zodat beide methodes op echte data te vergelijken zijn.
 
+## Versie 0.8.1 (27 okt, `Runner-0.8.1.zip`, bugfix verplaatsen)
+Louis verplaatste per ongeluk een rustige loop naar maandag 26 okt (gisteren) en kon hem daarna niet meer verplaatsen.
+- Oorzaak: het menu "Verplaatsen naar" bood ook voorbije dagen aan, en een training op een voorbije dag heeft de status "Gemist", waarbij het menu verdwijnt. `catchUp` had maandag al verwerkt, dus de coach noteerde hem niet eens als gemist; op zondag zou `finishWeek` hem wel als gemist tellen.
+- Fix: `AppModel.moveTargets(for:)` geeft enkel vrije dagen van vandaag of later in dezelfde week, voor trainingen zonder loop (ook een gemiste training van deze week die de coach nog niet als gemist noteerde). Gebruikt in de lijst, de maandkalender en de details. `Coach.moveWorkout(at:to:today:)` weigert een voorbije dag met `.dayPassed` ("Die dag is al voorbij."). Test `testMoveWorkoutNotToPastDay`.
+- Versie 0.8.1 (build 9).
+
+## Versie 0.9 (27 okt, `Runner-0.9.zip`, bevat ook 0.8.1)
+Op vraag van Louis: loopdagen wijzigen in de app zelf, coach-meldingen bewaren en een widget.
+
+**Loopdagen wijzigen zonder nieuw plan** (Plan › Plan beheren › Loopdagen wijzigen, `Plan/DaysSheet.swift`):
+- Kies loopdagen (2 tot 7), de dag voor de lange loop en de kwaliteitssessie (Auto of een dag). Met 4+ dagen ook de tweede sessie (Zwaarder en Piek), Auto of een dag. De rest wordt rustig. Zo kan Louis zijn rustige loopjes in het weekend leggen.
+- Geldt **vanaf vandaag** als er deze week nog niets gelopen of als gemist genoteerd is (dagen die al voorbij zijn vallen weg), anders **vanaf de maandag erna**. Eerdere weken blijven zoals ze waren. Weeknummer, fase, rustweken, niveau en opbouw blijven; het weekvolume wordt over de nieuwe dagen verdeeld. Verplaatsingen vanaf die week vervallen (hoorden bij de oude dagen), andere aanpassingen (Niet 100%, bevroren weken) blijven.
+- Het scherm toont live hoe het eruitziet: de eerste week met de nieuwe dagen, de volgende volle week en bij 4+ dagen de eerste week met twee kwaliteitssessies.
+- Kaart Plan toont de huidige loopdagen ("Loopdagen: di, do, za, zo · lange loop do · kwaliteit di"). Tijdritdatum volgt de nieuwe dag van de lange loop (`TrainingPlan.raceDate(calendar:)`).
+- Vragenreeks: vraag 6 (dag lange loop) heeft nu ook "Dag voor de kwaliteitssessie" (Auto of een dag).
+- LoopCore: `DaySchedule` (fromWeek, firstDay, runDays, longRunDay, qualityDays) in `AdaptationState.daySchedules` (optioneel veld); `PlanInput.qualityDays` (optioneel); `Coach.changeDays(_:longRunDay:qualityDays:today:)` en `Coach.days(forWeek:)`; de generator kiest per week de dagen, `pickQualityDays(..., preferred:)` neemt eerst de gekozen dagen. De start van het plan (`planStart`) blijft op de oorspronkelijke dagen gebaseerd, zodat de data niet verschuiven. Tests `DayScheduleTests`.
+
+**Coach-meldingen bewaren**: `CoachEvent` is nu Codable; meldingen staan in `coach-messages.json` (`SavedCoachMessage`, `RunStore.coachMessages()`), tot je ze wegtikt of tot 14 dagen. Tempovoorstellen en "gemist"/"verplaatst" overleven zo een herstart. Test `testCoachMessagesSurviveRestart`.
+
+**Widget "Training van vandaag"** (`RunnerWidgets/TodayWidget.swift`, klein, middel en vergrendelscherm):
+- Klein: VANDAAG + type in typekleur, titel, afstand en duur (of "Gelopen"), weekkilometers met oranje balkje. Rustdag: "Geen training vandaag" en de volgende training. Ook toestanden voor ziek, plan start nog, plan afgerond en geen gegevens ("Open Runner").
+- Middel: idem, met rechts de 3 volgende trainingen. Vergrendelscherm (rechthoek): type, titel, afstand en duur.
+- Gegevens: de app schrijft `WidgetSnapshot` (trainingen van 15 dagen, weekkilometers, ziek, start en einde plan) naar de gedeelde map en ververst de widget na elke planwijziging, elke loop en bij elke terugkeer naar de app. De widget maakt zelf een moment op elke middernacht.
+- **App Group zonder betaald account:** iloader (isideload) maakt bij het installeren zelf `group.<bundle-ID>` aan en geeft die aan app en extensie (nagelezen in de isideload-broncode, 27 okt). De bundle-ID op de iPhone krijgt daarbij de team-ID erachter (`com.loudecuyper.loopapp.<TEAMID>`), dus de groepsnaam wordt bij het starten uit `embedded.mobileprovision` gelezen, anders afgeleid uit de bundle-ID. Lukt dat niet, dan toont de widget "Open Runner" en werkt de rest gewoon. Gedeeld bestand `LoopApp/WidgetShared/WidgetSnapshot.swift` (in beide targets via `project.yml`).
+- Toevoegen: beginscherm lang indrukken › + › Runner.
+
+Versie 0.9 (build 10). Controle: Swift-syntax met tree-sitter, echte build en tests in Actions nog te doen.
+
 ## Volgende stap
-1. **Versie 0.8 pushen**, LoopCore-tests (`LivePaceTests`) en app-build in Actions controleren, installeren via iloader. De app verloopt zaterdag 25 okt, dus best samen met die herinstallatie.
-2. Na het installeren: toestemming voor meldingen geven, in Instellingen nakijken of de vervaldatum klopt (en of die ochtendmelding op de volgende trainingsdag binnenkomt).
+1. **Versie 0.9 pushen** (bevat ook 0.8.1), LoopCore-tests (`DayScheduleTests`, `testCoachMessagesSurviveRestart`, `testMoveWorkoutNotToPastDay`) en app-build in Actions controleren, installeren via iloader.
+2. Op de iPhone: de rustige loop van maandag 26 okt verplaatsen (of meteen Loopdagen wijzigen, dan valt hij weg), widget toevoegen en kijken of hij gegevens toont (zo niet: App Group werkte niet, melden).
 3. Volgende loop: letten op de overzichtsbalk (staafje, verbreding bij intervallen) en of tempo "nu" rustig blijft, ook onder bomen of tussen hoge gebouwen.
-4. Openstaand: punten verslepen in de routeplanner, coach-meldingen bewaren tussen app-starts, widget, Apple Health, loopband-modus.
+4. Openstaand: punten verslepen in de routeplanner, Apple Health (eerst nakijken of dat met een gratis Apple ID kan), loopband-modus.

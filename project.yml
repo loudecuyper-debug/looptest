@@ -7,8 +7,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.8"
-    CURRENT_PROJECT_VERSION: "8"
+    MARKETING_VERSION: "0.9"
+    CURRENT_PROJECT_VERSION: "10"
 packages:
   LoopCore:
     path: LoopCore
@@ -37,7 +37,8 @@ targets:
         CODE_SIGN_IDENTITY: ""
     scheme: {}
   RunnerWidgets:
-    # Widget-extensie: Live Activity tijdens het lopen (later ook de widget van vandaag).
+    # Widget-extensie: Live Activity tijdens het lopen en de widget "training van vandaag".
+    # De widget leest de gegevens uit de App Group die iloader bij het installeren aanmaakt.
     type: app-extension
     platform: iOS
     sources:
@@ -45,6 +46,7 @@ targets:
         excludes:
           - Info.plist
       - path: LoopApp/LiveActivity
+      - path: LoopApp/WidgetShared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.loudecuyper.loopapp.widgets

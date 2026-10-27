@@ -3,8 +3,8 @@ import SwiftUI
 import ActivityKit
 import AppIntents
 
-// Widget-extensie van Runner. Bevat voorlopig enkel de Live Activity tijdens het lopen;
-// later komt hier ook de widget "training van vandaag" bij.
+// Widget-extensie van Runner: de Live Activity tijdens het lopen en (sinds 27 okt) de widget
+// "training van vandaag" (`TodayWidget.swift`).
 //
 // Ontwerp 20 okt (canvas "Runner loopscherm", rij Live Activity), goedgekeurd door Louis:
 // - elk getal maar één keer, bloklabel in de kleur van het blok;
@@ -18,10 +18,11 @@ import AppIntents
 struct RunnerWidgetBundle: WidgetBundle {
     var body: some Widget {
         RunLiveActivity()
+        TodayWidget()
     }
 }
 
-private enum W {
+enum W {
     static let background = Color(hex: 0x0B0D10)
     static let card = Color(hex: 0x22272F)
     static let sunken = Color(hex: 0x15181D)
@@ -44,7 +45,7 @@ private enum W {
     }
 }
 
-private extension Color {
+extension Color {
     init(hex: UInt32) {
         self.init(.sRGB,
                   red: Double((hex >> 16) & 0xFF) / 255,

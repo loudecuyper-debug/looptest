@@ -7,6 +7,7 @@ import Foundation
 ///     runs-index.json       korte samenvatting per loop, voor lijsten en grafieken
 ///     meta.json             datum van de laatste backup
 ///     planned-routes.json   zelf geplande routes
+///     coach-messages.json   meldingen van de coach die nog op Vandaag staan
 public struct RunStore: Sendable {
     public let directory: URL
 
@@ -26,6 +27,7 @@ public struct RunStore: Sendable {
     var indexURL: URL { directory.appendingPathComponent("runs-index.json") }
     var metaURL: URL { directory.appendingPathComponent("meta.json") }
     var plannedRoutesURL: URL { directory.appendingPathComponent("planned-routes.json") }
+    var messagesURL: URL { directory.appendingPathComponent("coach-messages.json") }
     var runsDirectory: URL { directory.appendingPathComponent("runs", isDirectory: true) }
     func runURL(_ id: UUID) -> URL { runsDirectory.appendingPathComponent("\(id.uuidString).json") }
 
@@ -87,6 +89,18 @@ public struct RunStore: Sendable {
 
     public func deletePlannedRoute(id: UUID) throws {
         try write(try plannedRoutes().filter { $0.id != id }, to: plannedRoutesURL)
+    }
+
+    // MARK: - Meldingen van de coach (27 okt)
+
+    /// Meldingen die nog niet weggetikt zijn, zodat ze een herstart van de app overleven.
+    /// Een onleesbaar bestand (bv. van een nieuwere versie) geeft gewoon geen meldingen.
+    public func coachMessages() -> [SavedCoachMessage] {
+        (try? read([SavedCoachMessage].self, from: messagesURL)) ?? []
+    }
+
+    public func save(coachMessages: [SavedCoachMessage]) throws {
+        try write(coachMessages, to: messagesURL)
     }
 
     // MARK: - Backup
@@ -159,6 +173,19 @@ public struct RunStore: Sendable {
 
     private func sorted(_ index: [RunSummary]) -> [RunSummary] {
         index.sorted { $0.date > $1.date }
+    }
+}
+
+/// Een melding van de coach zoals ze bewaard wordt.
+public struct SavedCoachMessage: Codable, Equatable, Sendable {
+    public var id: UUID
+    public var created: Date
+    public var event: CoachEvent
+
+    public init(id: UUID = UUID(), created: Date = Date(), event: CoachEvent) {
+        self.id = id
+        self.created = created
+        self.event = event
     }
 }
 

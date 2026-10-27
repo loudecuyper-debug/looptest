@@ -43,11 +43,14 @@ public struct PlanInput: Codable, Equatable, Sendable {
     public var longestRunKm: Double
     public var runDays: [Weekday]
     public var longRunDay: Weekday
+    /// Zelf gekozen kwaliteitsdagen (zie `DaySchedule.qualityDays`). Nil of leeg = automatisch.
+    /// Optioneel, zodat plannen van vóór 27 okt gewoon inladen.
+    public var qualityDays: [Weekday]?
 
     public init(goal: PlanGoal, goalDistance: Double, weeks: Int, startDate: Date,
                 recentDistance: Double, recentTime: TimeInterval,
                 weeklyVolumeKm: Double, longestRunKm: Double,
-                runDays: [Weekday], longRunDay: Weekday) {
+                runDays: [Weekday], longRunDay: Weekday, qualityDays: [Weekday]? = nil) {
         self.goal = goal
         self.goalDistance = goalDistance
         self.weeks = weeks
@@ -58,6 +61,7 @@ public struct PlanInput: Codable, Equatable, Sendable {
         self.longestRunKm = longestRunKm
         self.runDays = runDays
         self.longRunDay = longRunDay
+        self.qualityDays = qualityDays
     }
 }
 
@@ -227,6 +231,13 @@ public struct TrainingPlan: Codable, Equatable, Sendable {
         self.input = input
         self.zones = zones
         self.weeks = weeks
+    }
+
+    /// Dag van de tijdrit in de laatste week (de dag van de lange loop die dan geldt).
+    public func raceDate(calendar: Calendar = PlanCalendar.default) -> Date? {
+        guard let last = weeks.last else { return nil }
+        let day = last.workouts.first { $0.type == .test }?.day ?? input.longRunDay
+        return last.date(for: day, calendar: calendar)
     }
 }
 

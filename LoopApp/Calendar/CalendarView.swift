@@ -108,8 +108,8 @@ struct CalendarView: View {
     private func row(_ day: PlanDay, workout: PlannedWorkout, week: PlanWeek) -> some View {
         let status = model.status(of: day)
         let date = week.date(for: day.day)
-        let free = ExtraRun.freeDays(in: week)
-        let canMove = (status == .today || status == .upcoming) && !free.isEmpty
+        let free = model.moveTargets(for: day)
+        let canMove = !free.isEmpty
 
         return NavigationLink(value: day) {
             HStack(spacing: 12) {
@@ -183,6 +183,8 @@ struct CalendarView: View {
             notice = "Op die dag staat al een training."
         case .alreadyDone?:
             notice = "Deze training is al gelopen."
+        case .dayPassed?:
+            notice = "Die dag is al voorbij."
         case .nothingToMove?, nil:
             break
         }

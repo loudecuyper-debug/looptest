@@ -3,9 +3,28 @@ import SwiftUI
 import LoopCore
 
 /// Een melding van de coach die op Vandaag getoond wordt.
+/// Sinds 27 okt bewaard tussen app-starts (`coach-messages.json`), tot je ze wegtikt of tot 14 dagen.
 struct CoachMessage: Identifiable {
-    let id = UUID()
+    let id: UUID
+    let created: Date
     let event: CoachEvent
+
+    /// Zo lang blijft een melding staan als je ze niet wegtikt.
+    static let keepDays = 14
+
+    init(event: CoachEvent) {
+        id = UUID()
+        created = Date()
+        self.event = event
+    }
+
+    init(saved: SavedCoachMessage) {
+        id = saved.id
+        created = saved.created
+        event = saved.event
+    }
+
+    var saved: SavedCoachMessage { SavedCoachMessage(id: id, created: created, event: event) }
 
     /// Het voorstel om tempo's aan te passen, als dit er een is.
     var suggestion: LevelSuggestion? {
@@ -38,7 +57,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var runs: [RunSummary] = []
     @Published private(set) var records: [PersonalRecord] = []
     @Published private(set) var plannedRoutes: [PlannedRoute] = []
-    @Published var messages: [CoachMessage] = []
+    @Published var messages: [CoachMessage] = [] {
+        didSet { saveMessages() }
+    }
     @Published var errorText: String?
 
     let calendar = PlanCalendar.default
@@ -57,6 +78,8 @@ final class AppModel: ObservableObject {
         } catch {
             errorText = "Je gegevens konden niet gelezen worden: \(error.localizedDescription)"
         }
+        let limit = Date().addingTimeInterval(-Double(CoachMessage.keepDays) * 86_400)
+        messages = (opened?.coachMessages() ?? []).filter { $0.created > limit }.map(CoachMessage.init(saved:))
         refreshPlan()
         refreshRecords()
         catchUp()
@@ -178,7 +201,57 @@ final class AppModel: ObservableObject {
     }
 
     func move(_ day: PlanDay, to target: Weekday) -> Coach.MoveOutcome? {
-        mutateCoach { $0.moveWorkout(at: day, to: target) }
+        mutateCoach { $0.moveWorkout(at: day, to: target, today: today) }
+    }
+
+    /// Dagen waar een training naartoe kan: vrij in dezelfde week en niet voorbij.
+    /// Ook een gemiste training van deze week zonder loop kan nog naar vandaag of later (27 okt).
+    func moveTargets(for day: PlanDay) -> [Weekday] {
+        guard let week = week(day), workout(at: day) != nil, run(for: day) == nil else { return [] }
+        if coach?.state.results.contains(where: { $0.when == day && $0.status != .skipped }) == true { return [] }
+        if case .finished? = moment() { return [] }
+        let now = today
+        if let now, day.week < now.week { return [] }
+        return ExtraRun.freeDays(in: week).filter { d in
+            guard let now else { return true }
+            return PlanDay(week: day.week, day: d) >= now
+        }
+    }
+
+    // MARK: - Loopdagen (27 okt)
+
+    /// Wat er gebeurt als je de loopdagen wijzigt: vanaf welke week, en hoe het plan er dan uitziet.
+    struct DaysPreview {
+        let fromWeek: Int
+        let startsToday: Bool
+        let plan: TrainingPlan
+    }
+
+    /// Loopdagen kunnen enkel gewijzigd worden zolang het plan nog loopt (of nog moet starten).
+    var canChangeDays: Bool {
+        guard coach != nil else { return false }
+        if case .finished? = moment() { return false }
+        return true
+    }
+
+    /// Loopdagen die nu gelden (of bij de start, als het plan nog niet begonnen is).
+    var currentDays: DaySchedule? {
+        coach?.days(forWeek: today?.week ?? 0)
+    }
+
+    func previewDays(_ days: [Weekday], longRunDay: Weekday, qualityDays: [Weekday]) -> DaysPreview? {
+        guard canChangeDays, var copy = coach else { return nil }
+        let now = today
+        guard let from = copy.changeDays(days, longRunDay: longRunDay, qualityDays: qualityDays, today: now),
+              let plan = copy.plan(calendar: calendar) else { return nil }
+        return DaysPreview(fromWeek: from, startsToday: now.map { $0.week == from } ?? false, plan: plan)
+    }
+
+    @discardableResult
+    func changeDays(_ days: [Weekday], longRunDay: Weekday, qualityDays: [Weekday]) -> Int? {
+        guard canChangeDays else { return nil }
+        let now = today
+        return mutateCoach { $0.changeDays(days, longRunDay: longRunDay, qualityDays: qualityDays, today: now) } ?? nil
     }
 
     func notFeeling(_ reason: NotFeelingReason) {
@@ -213,6 +286,10 @@ final class AppModel: ObservableObject {
         mutateCoach { $0.setLevel(vdot, fromWeek: week) }
     }
 
+    private func saveMessages() {
+        try? store?.save(coachMessages: messages.map(\.saved))
+    }
+
     private func push(_ events: [CoachEvent]) {
         messages.append(contentsOf: events.map { CoachMessage(event: $0) })
     }
@@ -239,6 +316,7 @@ final class AppModel: ObservableObject {
     private func refreshPlan() {
         plan = coach?.plan(calendar: calendar)
         rescheduleReminders()
+        updateWidget()
     }
 
     // MARK: - Loopjes
@@ -379,6 +457,7 @@ final class AppModel: ObservableObject {
     private func refreshRecords() {
         let all = (try? store?.allRuns()) ?? []
         records = Stats.personalRecords(all)
+        updateWidget()   // gelopen km en "gelopen" in de widget
     }
 
     // MARK: - Backup

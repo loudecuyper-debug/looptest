@@ -19,6 +19,8 @@ struct OnboardingAnswers {
     var longestKm = 8
     var runDays: Set<Weekday> = [.tuesday, .thursday, .sunday]
     var longRunDay: Weekday = .sunday
+    /// Dag voor de kwaliteitssessie, nil = automatisch (27 okt).
+    var qualityDay: Weekday?
     var durationMode: DurationMode = .weeks
     var weeks = 12
     var raceDate: Date = PlanCalendar.default.date(byAdding: .day, value: 7 * 11 + 6,
@@ -59,7 +61,8 @@ struct OnboardingAnswers {
         PlanInput(goal: goal, goalDistance: goalDistance, weeks: planWeeks, startDate: Date(),
                   recentDistance: performanceDistance, recentTime: performanceTime,
                   weeklyVolumeKm: Double(weeklyKm), longestRunKm: Double(longestKm),
-                  runDays: runDays.sorted(), longRunDay: longRunDay)
+                  runDays: runDays.sorted(), longRunDay: longRunDay,
+                  qualityDays: qualityDay.map { [$0] })
     }
 }
 
@@ -158,6 +161,9 @@ struct OnboardingView: View {
     private func next() {
         if step == .days, !answers.runDays.contains(answers.longRunDay) {
             answers.longRunDay = answers.runDays.contains(.sunday) ? .sunday : (answers.runDays.max() ?? .sunday)
+        }
+        if let q = answers.qualityDay, !answers.runDays.contains(q) || q == answers.longRunDay {
+            answers.qualityDay = nil
         }
         if step == .preview {
             onFinish(answers.input)
@@ -397,14 +403,26 @@ struct OnboardingView: View {
     // 6. Dag lange loop
 
     private var longDayStep: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        let others = answers.runDays.sorted().filter { $0 != answers.longRunDay }
+        return VStack(alignment: .leading, spacing: 20) {
             question("Op welke dag loop je lang?", "Kies een dag waarop je meer tijd hebt, vaak in het weekend.")
             VStack(spacing: 6) {
                 ForEach(answers.runDays.sorted(), id: \.self) { d in
-                    dayRow(d.name.capitalized, on: answers.longRunDay == d) { answers.longRunDay = d }
+                    dayRow(d.name.capitalized, on: answers.longRunDay == d) {
+                        answers.longRunDay = d
+                        if answers.qualityDay == d { answers.qualityDay = nil }
+                    }
                 }
             }
-            hint("De kwaliteitssessies komen zo ver mogelijk van deze dag te liggen.")
+            if !others.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    SectionLabel("Dag voor de kwaliteitssessie")
+                    DayChips(options: DayChips.withAuto(others), selection: $answers.qualityDay)
+                }
+            }
+            hint(answers.qualityDay == nil
+                 ? "Auto: de kwaliteitssessies komen zo ver mogelijk van de lange loop. Aanpassen kan later bij Plan › Plan beheren."
+                 : "De overige dagen worden rustige loopjes. Met 4 of meer dagen kiest de app de tweede sessie zelf; aanpassen kan later bij Plan › Plan beheren.")
         }
     }
 

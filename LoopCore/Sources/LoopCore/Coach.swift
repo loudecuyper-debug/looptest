@@ -181,6 +181,53 @@ public struct Coach: Codable, Equatable, Sendable {
         state.update(week: when.week) { $0.extraDays.removeAll { $0 == when.day } }
     }
 
+    // MARK: - Loopdagen wijzigen (27 okt)
+
+    /// Loopdagen die in een week gelden: gewijzigd via `changeDays`, anders die van het plan.
+    public func days(forWeek week: Int) -> DaySchedule {
+        state.daySchedule(forWeek: week)
+            ?? DaySchedule(fromWeek: 0, runDays: Array(Set(input.runDays)).sorted(), longRunDay: input.longRunDay,
+                           qualityDays: input.qualityDays ?? [])
+    }
+
+    /// Andere loopdagen, dag voor de lange loop en (optioneel) kwaliteitsdagen, zonder een nieuw plan.
+    /// Weeknummer, fase, niveau en opbouw blijven; enkel de verdeling over de dagen verandert.
+    /// Geldt vanaf vandaag als er deze week nog niets gelopen of als gemist genoteerd is (dagen die al
+    /// voorbij zijn vallen dan weg), anders vanaf de maandag erna. `today` nil = plan nog niet gestart.
+    /// Verplaatsingen vanaf die week vervallen (ze hoorden bij de oude dagen).
+    /// Geeft de eerste week terug waarin de nieuwe dagen gelden, nil als de keuze niet kan.
+    @discardableResult
+    public mutating func changeDays(_ runDays: [Weekday], longRunDay: Weekday, qualityDays: [Weekday] = [],
+                                    today: PlanDay?) -> Int? {
+        let days = Array(Set(runDays)).sorted()
+        guard days.count >= 2, days.contains(longRunDay), let plan = plan() else { return nil }
+        var quality: [Weekday] = []
+        for d in qualityDays where days.contains(d) && d != longRunDay && !quality.contains(d) { quality.append(d) }
+
+        let from: Int
+        var first = Weekday.monday
+        if let today {
+            if state.results.contains(where: { $0.when.week == today.week }) {
+                from = today.week + 1
+            } else {
+                from = today.week
+                first = today.day
+            }
+        } else {
+            from = 0
+        }
+        guard from < plan.weeks.count else { return nil }
+
+        var list = (state.daySchedules ?? []).filter { $0.fromWeek < from }
+        list.append(DaySchedule(fromWeek: from, firstDay: first, runDays: days, longRunDay: longRunDay,
+                                qualityDays: quality))
+        state.daySchedules = list
+        for w in from..<plan.weeks.count where state.adjustments[w] != nil {
+            state.adjustments[w]?.moves = [:]
+        }
+        return from
+    }
+
     // MARK: - Verslepen in de kalender
 
     public enum MoveOutcome: Equatable, Sendable {
@@ -189,14 +236,19 @@ public struct Coach: Codable, Equatable, Sendable {
         case dayTaken
         case nothingToMove
         case alreadyDone
+        /// De gekozen dag is al voorbij (27 okt).
+        case dayPassed
     }
 
     /// Workout zelf naar een andere dag van dezelfde week slepen.
-    public mutating func moveWorkout(at when: PlanDay, to day: Weekday) -> MoveOutcome {
+    /// Met `today` kan een training niet naar een dag vóór vandaag; een gemiste training zonder
+    /// loop mag wel nog naar vandaag of later in dezelfde week.
+    public mutating func moveWorkout(at when: PlanDay, to day: Weekday, today: PlanDay? = nil) -> MoveOutcome {
         guard let plan = self.plan(), when.week < plan.weeks.count else { return .nothingToMove }
         let week = plan.weeks[when.week]
         guard let workout = week.workout(on: when.day) else { return .nothingToMove }
         guard day != when.day else { return .moved(warning: nil) }
+        if let today, PlanDay(week: when.week, day: day) < today { return .dayPassed }
         guard week.workout(on: day) == nil else { return .dayTaken }
         if state.results.contains(where: { $0.when == when && $0.status != .skipped }) { return .alreadyDone }
 

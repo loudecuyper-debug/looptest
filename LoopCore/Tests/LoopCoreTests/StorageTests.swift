@@ -198,6 +198,34 @@ final class StorageTests: XCTestCase {
         XCTAssertNil(Stats.bestTime(km: 10, splits: splits))
     }
 
+    // MARK: - Meldingen van de coach (27 okt)
+
+    func testCoachMessagesSurviveRestart() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = try RunStore(directory: dir)
+        XCTAssertEqual(store.coachMessages(), [])
+
+        let suggestion = LevelSuggestion(fromWeek: 3, oldVdot: 40, newVdot: 40.5, exampleLabel: "interval",
+                                         oldPace: 290, newPace: 287)
+        let events: [CoachEvent] = [
+            .levelSuggestion(suggestion),
+            .testResult(oldVdot: 40, newVdot: 41, predicted10k: 2_950),
+            .sessionMoved(title: "Fartlek", to: .friday),
+            .sessionDropped(title: "Lange loop"),
+            .weekNotCounted(week: 2, missed: 2),
+            .notFeelingApplied(.tired),
+            .backToPlan,
+            .easyTooFastTip
+        ]
+        let saved = events.map { SavedCoachMessage(created: date(10, 27), event: $0) }
+        try store.save(coachMessages: saved)
+
+        let reopened = try RunStore(directory: dir)
+        XCTAssertEqual(reopened.coachMessages(), saved)
+        XCTAssertEqual(reopened.coachMessages().first?.event, .levelSuggestion(suggestion))
+    }
+
     // MARK: - Verslepen in de kalender
 
     func testMoveWorkout() throws {
@@ -216,6 +244,20 @@ final class StorageTests: XCTestCase {
 
         _ = coach.record(RunResult(when: PlanDay(week: 2, day: .tuesday)))
         XCTAssertEqual(coach.moveWorkout(at: PlanDay(week: 2, day: .tuesday), to: .monday), .alreadyDone)
+    }
+
+    /// Niet naar een voorbije dag; een gemiste training zonder loop mag wel nog vooruit (27 okt).
+    func testMoveWorkoutNotToPastDay() throws {
+        var coach = Coach(input: input())
+        let today = PlanDay(week: 1, day: .wednesday)
+        XCTAssertEqual(coach.moveWorkout(at: PlanDay(week: 1, day: .thursday), to: .monday, today: today), .dayPassed)
+        XCTAssertEqual(try XCTUnwrap(coach.plan(calendar: utc)).weeks[1].workout(on: .thursday)?.type, .tempo)
+
+        XCTAssertEqual(coach.moveWorkout(at: PlanDay(week: 1, day: .tuesday), to: .wednesday, today: today),
+                       .moved(warning: nil))
+        let week = try XCTUnwrap(coach.plan(calendar: utc)).weeks[1]
+        XCTAssertNil(week.workout(on: .tuesday))
+        XCTAssertEqual(week.workout(on: .wednesday)?.type, .easy)
     }
 
     func testMoveWorkoutTwiceKeepsOneSession() throws {

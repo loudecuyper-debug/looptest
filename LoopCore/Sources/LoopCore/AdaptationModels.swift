@@ -138,7 +138,7 @@ public struct LevelSuggestion: Codable, Equatable, Sendable {
 }
 
 /// Wat de coach je laat weten. Toon: zakelijk en feitelijk, zonder verkleinwoorden.
-public enum CoachEvent: Equatable, Sendable {
+public enum CoachEvent: Codable, Equatable, Sendable {
     case levelSuggestion(LevelSuggestion)
     case testResult(oldVdot: Double, newVdot: Double, predicted10k: TimeInterval)
     case easyTooFastTip
@@ -195,6 +195,28 @@ public enum CoachEvent: Equatable, Sendable {
     }
 }
 
+/// Loopdagen vanaf een bepaalde week (Plan › Loopdagen wijzigen, 27 okt 2026).
+/// Zonder schema gelden de dagen uit `PlanInput`.
+public struct DaySchedule: Codable, Equatable, Sendable {
+    public var fromWeek: Int
+    /// In de eerste week van dit schema vallen dagen vóór deze dag weg: die waren al voorbij bij het wijzigen.
+    public var firstDay: Weekday
+    public var runDays: [Weekday]
+    public var longRunDay: Weekday
+    /// Gekozen kwaliteitsdagen: de eerste voor de hoofdsessie, de tweede voor de extra tempo
+    /// (enkel met 4+ dagen, in Zwaarder en Piek). Leeg = automatisch.
+    public var qualityDays: [Weekday]
+
+    public init(fromWeek: Int, firstDay: Weekday = .monday, runDays: [Weekday], longRunDay: Weekday,
+                qualityDays: [Weekday] = []) {
+        self.fromWeek = fromWeek
+        self.firstDay = firstDay
+        self.runDays = runDays
+        self.longRunDay = longRunDay
+        self.qualityDays = qualityDays
+    }
+}
+
 /// De volledige toestand van de coach. Codable, de app bewaart dit als JSON.
 public struct AdaptationState: Codable, Equatable, Sendable {
     public var adjustments: [Int: WeekAdjustment] = [:]
@@ -204,6 +226,8 @@ public struct AdaptationState: Codable, Equatable, Sendable {
     /// Laatste plandag (index) die `Coach.catchUp` verwerkte: gemist genoteerd en, op zondag, de week afgesloten.
     /// Optioneel, zodat oudere bewaarde gegevens zonder dit veld gewoon inladen.
     public var processedThrough: Int?
+    /// Gewijzigde loopdagen, oplopend op `fromWeek`. Optioneel om dezelfde reden (27 okt).
+    public var daySchedules: [DaySchedule]?
 
     // Geheugen voor de regels
     var qualitySignals: [Int] = []
@@ -218,6 +242,11 @@ public struct AdaptationState: Codable, Equatable, Sendable {
     /// Niveau dat in een bepaalde week geldt.
     public func vdot(forWeek week: Int, initial: Double) -> Double {
         levelChanges.filter { $0.fromWeek <= week }.last?.vdot ?? initial
+    }
+
+    /// Gewijzigde loopdagen die in een week gelden, nil = de dagen uit het plan.
+    public func daySchedule(forWeek week: Int) -> DaySchedule? {
+        daySchedules?.last { $0.fromWeek <= week }
     }
 
     public func adjustment(forWeek week: Int) -> WeekAdjustment {

@@ -11,6 +11,8 @@ import Foundation
 /// - Laatste week: tijdrit over de doelafstand.
 /// - Start: in de week waarin het plan gemaakt wordt; loopdagen die al voorbij zijn vallen weg.
 ///   Is er die week geen loopdag meer over, dan start het plan de maandag erna.
+/// - Loopdagen kunnen per week wijzigen (`DaySchedule`, 27 okt): volume, fase en opbouw lopen door,
+///   enkel de verdeling over de dagen verandert. Kwaliteitsdagen zelf kiezen kan, anders automatisch.
 ///
 /// Aanpassingen van de coach (`AdaptationState`) worden bij elke berekening toegepast:
 /// niveau per week, bevroren weken, verschoven rustweken, verplaatste sessies,
@@ -44,9 +46,6 @@ public enum PlanGenerator {
         let peakVolume = min(startVolume * 1.6, startVolume + 15)
         let longCap = longRunCapKm(goalDistance: input.goalDistance)
 
-        let qualityCount = days.count <= 3 ? 1 : 2
-        let qualityDays = pickQualityDays(days: days, longRunDay: input.longRunDay, count: qualityCount)
-
         var volumeTrend = startVolume / volumeGrowth
         var longTrend = min(input.longestRunKm, 0.45 * startVolume + 1) - 1
         var lastLong = longTrend
@@ -55,6 +54,19 @@ public enum PlanGenerator {
 
         for w in 0..<input.weeks {
             let adj = adaptation.adjustment(forWeek: w)
+            let schedule = adaptation.daySchedule(forWeek: w)
+            let weekDays: [Weekday]
+            let longDay: Weekday
+            if let schedule, Set(schedule.runDays).count >= 2, schedule.runDays.contains(schedule.longRunDay) {
+                weekDays = Array(Set(schedule.runDays)).sorted()
+                longDay = schedule.longRunDay
+            } else {
+                weekDays = days
+                longDay = input.longRunDay
+            }
+            let qualityCount = weekDays.count <= 3 ? 1 : 2
+            let qualityDays = pickQualityDays(days: weekDays, longRunDay: longDay, count: qualityCount,
+                                              preferred: schedule?.qualityDays ?? input.qualityDays ?? [])
             let weekVdot = adaptation.vdot(forWeek: w, initial: zones.vdot)
             let weekZones = PaceZones(vdot: weekVdot)
             let phase = phases[w]
@@ -102,16 +114,16 @@ public enum PlanGenerator {
             }
 
             if phase == .taper {
-                workouts.append(SimpleRuns.timeTrial(day: input.longRunDay, distance: input.goalDistance))
+                workouts.append(SimpleRuns.timeTrial(day: longDay, distance: input.goalDistance))
             } else if phase == .peak && !isRecovery && posInPhase == 1 {
-                workouts.append(SimpleRuns.progression(day: input.longRunDay, km: longKm))
+                workouts.append(SimpleRuns.progression(day: longDay, km: longKm))
             } else {
-                workouts.append(SimpleRuns.long(day: input.longRunDay, km: longKm))
+                workouts.append(SimpleRuns.long(day: longDay, km: longKm))
             }
 
             // Rustige loopjes vullen de rest van het volume op.
             let used = workouts.reduce(0.0) { $0 + $1.estimatedDistance(zones: weekZones) / 1000 }
-            let easyDays = days.filter { d in !workouts.contains { $0.day == d } }
+            let easyDays = weekDays.filter { d in !workouts.contains { $0.day == d } }
             if !easyDays.isEmpty {
                 let perRun = phase == .taper ? 3 : max(3, roundHalf((volume - used) / Double(easyDays.count)))
                 for d in easyDays { workouts.append(SimpleRuns.easy(day: d, km: perRun)) }
@@ -121,6 +133,8 @@ public enum PlanGenerator {
 
             // Week 1 begint op de dag dat het plan gemaakt werd: eerdere dagen vallen weg.
             if w == 0 { workouts.removeAll { $0.day < firstDay } }
+            // Loopdagen gewijzigd midden in een week: de dagen die toen al voorbij waren vallen weg.
+            if let schedule, schedule.fromWeek == w { workouts.removeAll { $0.day < schedule.firstDay } }
 
             let start = calendar.date(byAdding: .day, value: 7 * w, to: monday) ?? monday
             weeks.append(PlanWeek(number: w + 1, phase: phase, isRecoveryWeek: isRecovery,
@@ -196,11 +210,16 @@ public enum PlanGenerator {
             + [Phase.taper]
     }
 
-    /// Kiest de kwaliteitsdagen: zo ver mogelijk van de lange loop en van elkaar,
-    /// bij gelijke afstand de vroegste dag.
-    public static func pickQualityDays(days: [Weekday], longRunDay: Weekday, count: Int) -> [Weekday] {
+    /// Kiest de kwaliteitsdagen. Eerst de zelf gekozen dagen (`preferred`, in volgorde, enkel loopdagen
+    /// en niet de dag van de lange loop), de rest automatisch: zo ver mogelijk van de lange loop en
+    /// van elkaar, bij gelijke afstand de vroegste dag.
+    public static func pickQualityDays(days: [Weekday], longRunDay: Weekday, count: Int,
+                                       preferred: [Weekday] = []) -> [Weekday] {
         var picked: [Weekday] = []
-        for _ in 0..<count {
+        for d in preferred where picked.count < count && days.contains(d) && d != longRunDay && !picked.contains(d) {
+            picked.append(d)
+        }
+        while picked.count < count {
             let candidates = days.filter { $0 != longRunDay && !picked.contains($0) }
             guard !candidates.isEmpty else { break }
             func score(_ d: Weekday) -> Int {
@@ -210,7 +229,8 @@ public enum PlanGenerator {
                 let sa = score(a), sb = score(b)
                 return sa != sb ? sa < sb : a.rawValue > b.rawValue
             }
-            if let best { picked.append(best) }
+            guard let best else { break }
+            picked.append(best)
         }
         return picked
     }

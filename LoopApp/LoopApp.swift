@@ -72,6 +72,7 @@ struct RootView: View {
             if phase == .active {
                 model.catchUp()
                 model.rescheduleReminders()   // venster van 14 dagen schuift mee
+                model.updateWidget()          // idem voor de widget
             }
         }
         .task(id: model.coach != nil) {

@@ -6,6 +6,7 @@ struct PlanView: View {
     @State private var showManage = false
     @State private var showOnboarding = false
     @State private var showLevel = false
+    @State private var showDays = false
 
     var body: some View {
         NavigationStack {
@@ -24,13 +25,19 @@ struct PlanView: View {
             }
             .screenTitle("Jouw plan")
             .confirmationDialog("Plan beheren", isPresented: $showManage, titleVisibility: .visible) {
+                if model.canChangeDays {
+                    Button("Loopdagen wijzigen") { showDays = true }
+                }
                 Button("Nieuw plan maken", role: .destructive) { showOnboarding = true }
                 Button("Annuleren", role: .cancel) {}
             } message: {
-                Text("Loopdagen, de dag van je lange loop of je doel wijzigen doe je met een nieuw plan. Dat vervangt je huidige plan en de aanpassingen van de coach. Je gelopen loopjes blijven bewaard.")
+                Text("Loopdagen wijzigen doe je zonder je opbouw te verliezen. Je doel of startniveau wijzigen doe je met een nieuw plan: dat vervangt je huidige plan en de aanpassingen van de coach. Je gelopen loopjes blijven bewaard.")
             }
             .sheet(isPresented: $showLevel) {
                 LevelSheet(test: nil)
+            }
+            .sheet(isPresented: $showDays) {
+                DaysSheet()
             }
             .fullScreenCover(isPresented: $showOnboarding) {
                 OnboardingView(onCancel: { showOnboarding = false }) { input in
@@ -52,8 +59,7 @@ struct PlanView: View {
     // MARK: - Kaarten
 
     private func planCard(_ plan: TrainingPlan) -> some View {
-        let last = plan.weeks.last
-        let raceDate = last?.date(for: plan.input.longRunDay)
+        let raceDate = plan.raceDate(calendar: model.calendar)
         let total = plan.weeks.reduce(0.0) { $0 + $1.estimatedDistance(zones: $1.zones) }
 
         return Card {
@@ -68,6 +74,12 @@ struct PlanView: View {
                     }
                 }
                 PhaseStrip(weeks: plan.weeks, current: currentWeekNumber)
+                if let days = model.currentDays {
+                    Text(PlanTexts.days(days))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 HStack(alignment: .top) {
                     StatBlock(label: "Weken", value: "\(currentWeekNumber ?? 0)/\(plan.weeks.count)", size: 24)
                     StatBlock(label: "Totale afstand", value: "\(Fmt.decimal(total / 1000)) km", size: 24)
